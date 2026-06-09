@@ -52,11 +52,11 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
 
   // 컴포넌트 마운트 시 LocalStorage에서 임시저장 데이터 불러오기
   useEffect(() => {
-    const saved = localStorage.getItem('hr_temp_form');
+    const saved = localStorage.getItem('draft_user_form');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setFormData(prev => ({ ...prev, ...parsed }));
+        setTimeout(() => setFormData(prev => ({ ...prev, ...parsed })), 0);
       } catch(e) {}
     }
   }, []);
@@ -105,7 +105,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
 
   const formatBankAccount = (bank: string, value: string) => {
     // 숫자만 추출
-    let num = value.replace(/[^\d]/g, '');
+    const num = value.replace(/[^\d]/g, '');
     if (!bank) return num;
 
     // 간단한 은행별 하이픈 마스킹 예시 (실무에 맞춰 정밀하게 조정 가능)

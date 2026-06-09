@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------
+// RBAC (Role-Based Access Control) Models
+// -----------------------------------------
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g. "CEO", "ADMIN", "BRANCH_MGR", "DIV_HEAD", "TEAM_LEADER", "REGULAR"
+  displayName String   // e.g. "대표", "총무", "지점장"
+  description String?
+  
+  permissions RolePermission[]
+  users       User[]
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  action      String   @unique // e.g. "VIEW_REVENUE", "EDIT_USERS", "DELETE_CONTRACTS"
+  description String?
+  
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+// -----------------------------------------
+// User & Core Entities
+// -----------------------------------------
+model User {
+  id         String   @id @default(cuid())
+  employeeId String   @unique @default(cuid())
+  name       String
+  
+  // Legacy String role (will be deprecated once RBAC is fully populated)
+  role       String   
+  
+  // New RBAC relation
+  roleId     String?
+  rbacRole   Role?    @relation(fields: [roleId], references: [id])
+
+  // 개인정보 확장 필드
+  birthDate  String?  // YYYY-MM-DD
+  ssnSuffix  String?  // 암호화/마스킹 된 뒷자리 보관용
+  phone      String?
+  address    String?
+  bankAccount String? // 계좌번호 (예: 국민은행 12345-...)
+  
+  // 상태 관리 (Soft Delete)
+  status     String   @default("ACTIVE") // "ACTIVE", "RESIGNED"
+  joinedAt   DateTime @default(now())
+  resignedAt DateTime?
+
+  // Self-relation for upline manager (계보도)
+  uplineId  String?
+  upline    User?    @relation("UserUpline", fields: [uplineId], references: [id])
+  downlines User[]   @relation("UserUpline")
+
+  contracts   Contract[]
+  settlements Settlement[]
+  documents   UserDocument[]
+  roleHistory UserRoleHistory[]
+}
+
+model UserDocument {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  type       String   // "등본", "통장사본", "자격증", "이력서" 등
+  fileUrl    String   // 스토리지 상의 경로 또는 S3 URL
+  uploadedAt DateTime @default(now())
+}
+
+model UserRoleHistory {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  role       String   // 변경된 직급
+  promotedAt DateTime @default(now()) // 승진 시점
+}
+
+model Contract {
+  id               String   @id @default(cuid())
+  agentId          String
+  agent            User     @relation(fields: [agentId], references: [id])
+  grossCommission  Int      // 부가세 별도 총액
+  contractDate     DateTime @default(now())
+  
+  // 개별 계약 건의 전자결재/지급 상태
+  signatureStatus  String   @default("PENDING") // PENDING, SIGNED
+  signatureDate    DateTime?
+  paymentStatus    String   @default("PENDING") // PENDING, PAID, NON_PAID
+  paymentDate      DateTime?
+}
+
+model Settlement {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  yearMonth   String
+  basePay     Int
+  bonusPay    Int
+  overridePay Int
+  totalPay    Int
+  
+  // 월간 정산서의 전자결재/지급 상태
+  signatureStatus  String   @default("PENDING") // PENDING, SIGNED
+  signatureDate    DateTime?
+  paymentStatus    String   @default("PENDING") // PENDING, PAID, NON_PAID
+  paymentDate      DateTime?
+  
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String   // "CREATE", "UPDATE", "DELETE"
+  entity     String   // "USER", "CONTRACT", "SETTLEMENT"
+  entityId   String   // 수정된 대상의 ID
+  actorId    String   // 수정을 가한 사람의 ID (ex: "ADMIN", 혹은 employeeId)
+  beforeData String?  // 수정 전 데이터 (JSON String)
+  afterData  String?  // 수정 후 데이터 (JSON String)
+  reason     String?  // 수정 사유
+  createdAt  DateTime @default(now())
+}
+
+model Notice {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  authorId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------
+// Onboarding & Approval Pipeline
+// -----------------------------------------
+model OnboardingRequest {
+  id              String   @id @default(uuid())
+  name            String
+  birthDate       String
+  ssnSuffix       String?  // 암호화 보관
+  phone           String
+  address         String
+  bankAccount     String
+  
+  // 지원 서류 (단순화를 위해 JSON Array 형태로 URL 목록 저장)
+  documents       String   // JSON string: [{ type: "이력서", url: "..." }]
+  
+  // AI 멘토링 분석 리포트
+  aiAnalysis      String?  // JSON string: { strengths: "...", personality: "...", mentoringStrategy: "..." }
+  
+  // ATS 채용 파이프라인 단계: NEW -> RECRUITER -> PRACTICAL -> MANAGER -> FINAL -> ONBOARDING
+  atsStage        String   @default("NEW")
+  
+  // 순차 결재 상태: PENDING_TL -> PENDING_DH -> PENDING_BM -> PENDING_CEO -> APPROVED / REJECTED
+  status          String   @default("PENDING_TL") 
+  
+  // 결재자 메모 (멘토링 시뮬레이션용)
+  tlMemo          String?  // 팀장 메모
+  dhMemo          String?  // 본부장 메모
+  bmMemo          String?  // 지점장 메모
+  ceoMemo         String?  // 대표/총무 메모
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+

@@ -1,0 +1,36 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Generate Prisma Client
+      run: npx prisma generate
+
+    - name: Check Linting
+      run: npm run lint
+
+    - name: Build Next.js Application
+      run: npm run build
+      env:
+        # 빌드 테스트를 위한 더미 환경 변수
+        DATABASE_URL: "file:./dev.db"

@@ -10,6 +10,7 @@ backlinks: [[SSOT_Commission_100won_Rule.md]], [[home_api]], [[admin_transparenc
 import { useState, useEffect, useCallback } from 'react';
 import { getPayoutRate } from '@/lib/commissionBreakdown';
 import { ROLES, ROLES_KO, type UserRole } from '@/types';
+import AssistantPanel from '@/components/assistant/AssistantPanel';
 
 type Share = { key: string; label: string; amount: number; pct: number; formula: string };
 type HomeData = {
@@ -73,6 +74,9 @@ export default function HomePage() {
 
   // 오버라이딩 시뮬레이터
   const [simN, setSimN] = useState(3);
+
+  // AI 보좌관 패널 토글
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('demoUserId');
@@ -341,6 +345,27 @@ export default function HomePage() {
           </>
         )}
       </div>
+
+      {/* ===== AI 보좌관 (선택된 직원이 있을 때만) ===== */}
+      {data && !loading && (
+        <>
+          {!assistantOpen && (
+            <button
+              onClick={() => setAssistantOpen(true)}
+              aria-label="AI 보좌관 열기"
+              className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center
+                         rounded-full bg-indigo-600 text-2xl shadow-lg shadow-indigo-900/50 hover:bg-indigo-500"
+            >💬</button>
+          )}
+          {assistantOpen && (
+            <AssistantPanel
+              userId={data.user.id}
+              userName={data.user.name}
+              onClose={() => setAssistantOpen(false)}
+            />
+          )}
+        </>
+      )}
     </main>
   );
 }

@@ -22,7 +22,7 @@ function applyRateLimit(ip: string): boolean {
     return record.count <= MAX_REQUESTS_PER_WINDOW;
 }
 
-export async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
     const ip = request.ip || request.headers.get('x-forwarded-for') || '127.0.0.1';
     
     // 1. Rate Limiting

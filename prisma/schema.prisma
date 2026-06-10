@@ -70,10 +70,82 @@ model User {
   upline    User?    @relation("UserUpline", fields: [uplineId], references: [id])
   downlines User[]   @relation("UserUpline")
 
+  // M2: 실인증 (비밀번호 해시 — 미설정 시 최초 로그인에서 설정)
+  passwordHash String?
+
   contracts   Contract[]
   settlements Settlement[]
   documents   UserDocument[]
   roleHistory UserRoleHistory[]
+  properties   Property[]
+  customers    Customer[]
+  appointments Appointment[]
+}
+
+// -----------------------------------------
+// M4: 매물 원장 / M5: 고객 원장 / M11: 일정 (2026-06-11 전 마일스톤 개방 — 순수 증축)
+// -----------------------------------------
+model Property {
+  id            String   @id @default(cuid())
+  address       String
+  propertyType  String   // 아파트, 오피스텔, 빌라, 상가, 사무실, 토지, 기타
+  dealType      String   // 매매, 전세, 월세
+  price         Int      // 매매가 또는 보증금 (원)
+  monthlyRent   Int?     // 월세 (원)
+  areaM2        Float?   // 전용면적 (m²)
+  description   String?
+  imageUrls     String?  // JSON string: ["url", ...]
+  status        String   @default("ACTIVE") // ACTIVE, CONTRACTED, HIDDEN
+
+  // Trust 인증매물 필드 (M13 연계)
+  ownerName     String?
+  ownerVerified Boolean  @default(false) // 의뢰인 본인인증 마크
+  fieldVerifiedAt DateTime?              // 현장 인증(GPS 셀카) 시각
+
+  agentId       String
+  agent         User     @relation(fields: [agentId], references: [id])
+  customerId    String?  // 매물 의뢰 고객
+  customer      Customer? @relation(fields: [customerId], references: [id])
+
+  appointments  Appointment[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  type      String   // 임대인, 임차인, 매수인, 매도인, 기타
+  source    String?  // 유입 경로 (네이버, 소개, 워크인 등)
+  memo      String?
+  status    String   @default("ACTIVE") // ACTIVE, ARCHIVED
+
+  agentId   String
+  agent     User     @relation(fields: [agentId], references: [id])
+
+  properties   Property[]
+  appointments Appointment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  title       String
+  type        String   // 임장, 계약, 상담, 기타
+  scheduledAt DateTime
+  memo        String?
+  status      String   @default("SCHEDULED") // SCHEDULED, DONE, CANCELED
+
+  agentId     String
+  agent       User      @relation(fields: [agentId], references: [id])
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  propertyId  String?
+  property    Property? @relation(fields: [propertyId], references: [id])
+
+  createdAt   DateTime @default(now())
 }
 
 model UserDocument {

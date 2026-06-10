@@ -51,14 +51,24 @@ function Krw({ amount, className }: { amount: number; className?: string }) {
   return <span className={className}>₩ {v.toLocaleString('ko-KR')}</span>;
 }
 
-const SHARE_STYLE: Record<string, { bar: string; text: string; ring: string }> = {
-  agent:      { bar: 'bg-emerald-500',  text: 'text-emerald-400', ring: 'ring-emerald-500/30' },
-  agentBonus: { bar: 'bg-emerald-700', text: 'text-emerald-500', ring: 'ring-emerald-700/30' },
-  teamLeader: { bar: 'bg-indigo-500',  text: 'text-indigo-400',  ring: 'ring-indigo-500/30' },
-  divHead:    { bar: 'bg-indigo-700',  text: 'text-indigo-400',  ring: 'ring-indigo-700/30' },
-  branchPool: { bar: 'bg-indigo-900',  text: 'text-indigo-500',  ring: 'ring-indigo-900/40' },
-  company:    { bar: 'bg-zinc-600',    text: 'text-zinc-400',    ring: 'ring-zinc-600/30' },
-};
+const fmt = (n: number) => `₩ ${n.toLocaleString('ko-KR')}`;
+
+/** 급여명세서 한 행 — 항목 좌측 / 금액 우측, 합계만 굵게. 장식 금지. */
+function SpecRow({
+  label, sub, amount, bold = false, amountClass = 'text-zinc-200', divider = true,
+}: {
+  label: string; sub?: string; amount: number; bold?: boolean; amountClass?: string; divider?: boolean;
+}) {
+  return (
+    <div className={`flex items-baseline justify-between gap-4 py-2.5 ${divider ? 'border-b border-[#1f2430]/60' : ''}`}>
+      <div className="min-w-0">
+        <span className={`text-[14px] ${bold ? 'font-bold text-white' : 'text-zinc-300'}`}>{label}</span>
+        {sub && <span className="ml-2 text-[12px] text-zinc-600">{sub}</span>}
+      </div>
+      <span className={`shrink-0 text-right text-[14px] ${bold ? 'font-bold' : ''} ${amountClass}`}>{fmt(amount)}</span>
+    </div>
+  );
+}
 
 export default function TransparencyTracerPage() {
   const [yearMonth, setYearMonth] = useState(new Date().toISOString().substring(0, 7));
@@ -69,6 +79,7 @@ export default function TransparencyTracerPage() {
   const [trace, setTrace] = useState<TraceData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 정산 페이지에서 ?userId= 로 진입한 경우 자동 로드
@@ -116,29 +127,16 @@ export default function TransparencyTracerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id, yearMonth]);
 
-  const recipientName = (key: string): string => {
-    if (!trace) return '';
-    const r = trace.recipients;
-    switch (key) {
-      case 'agent':
-      case 'agentBonus': return trace.user.name;
-      case 'teamLeader': return r.teamLeader?.name ?? '(직속 팀장 없음 → 회사 귀속)';
-      case 'divHead': return r.divHead?.name ?? '(소속 본부장 없음 → 회사 귀속)';
-      case 'branchPool': return r.branchMgrCount > 0 ? `지점장 ${r.branchMgrCount}명 균등 분배` : '(지점장 없음 → 회사 귀속)';
-      case 'company': return '자리 공인중개사 법인';
-      default: return '';
-    }
-  };
-
-  const maxPct = trace ? Math.max(...trace.breakdown.shares.map(s => s.pct), 1) : 1;
+  const shareAmt = (key: string): number =>
+    trace?.breakdown.shares.find(s => s.key === key)?.amount ?? 0;
+  const shareFormula = (key: string): string =>
+    trace?.breakdown.shares.find(s => s.key === key)?.formula ?? '';
 
   return (
     <div className="min-h-screen bg-[#0a0c10] text-[#cdd2da] p-6 lg:p-10" style={{ wordBreak: 'keep-all' }}>
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes traceIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes barGrow { from { width: 0; } }
-        .trace-row { animation: traceIn 0.5s cubic-bezier(0.22,1,0.36,1) both; }
-        .trace-bar { animation: barGrow 1.1s cubic-bezier(0.22,1,0.36,1) both; }
+        @keyframes stackGrow { from { width: 0; } }
+        .stack-seg { animation: stackGrow 1.1s cubic-bezier(0.22,1,0.36,1) both; }
       `}} />
 
       <div className="max-w-5xl mx-auto space-y-8">
@@ -195,116 +193,126 @@ export default function TransparencyTracerPage() {
           </div>
         )}
 
-        {!loading && trace && (
-          <div className="space-y-8">
-            {/* 히어로: 가장 크고 밝은 숫자의 주인은 "이 사람이 받는 돈"이다 (2026-06-11 대표 UX 원칙) */}
-            {(() => {
-              const agentTotal = trace.breakdown.shares
-                .filter(s => s.key === 'agent' || s.key === 'agentBonus')
-                .reduce((s, x) => s + x.amount, 0);
-              const agentPct = trace.gross > 0 ? Math.round((agentTotal / trace.gross) * 1000) / 10 : 0;
-              return (
-                <div className="trace-row bg-[#11141a] border border-emerald-900/40 rounded-2xl p-8 relative overflow-hidden">
-                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" />
-                  <p className="text-[13px] text-zinc-500 text-center mb-5">
-                    {trace.yearMonth} · <span className="text-zinc-300 font-medium">{trace.user.name}</span>
-                    <span className="ml-1 text-zinc-500">({ROLES_KO[trace.user.role as UserRole] ?? trace.user.role})</span>
-                    {' '}· 계약 {trace.contracts.length}건
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-center">
-                    <div className="text-center sm:text-right order-2 sm:order-1">
-                      <p className="text-[12px] text-zinc-500 mb-1">창출한 매출 총액</p>
-                      <Krw amount={trace.gross} className="text-xl font-semibold text-zinc-300" />
-                    </div>
-                    <div className="text-center order-1 sm:order-2">
-                      <p className="text-[13px] font-semibold text-emerald-300/90 mb-1">
-                        {trace.user.name}님이 받는 돈 <span className="text-zinc-500 font-normal">(영업분 실수령 예상)</span>
-                      </p>
-                      <Krw amount={agentTotal} className="text-5xl font-bold text-emerald-400 tracking-tight drop-shadow-[0_0_24px_rgba(52,211,153,0.15)]" />
-                      <p className="text-[13px] text-zinc-500 mt-2">= 매출 총액의 <span className="text-emerald-400 font-semibold">{agentPct}%</span></p>
-                    </div>
-                    <div className="text-center sm:text-left order-3">
-                      <p className="text-[12px] text-zinc-500 mb-1">회사·관리 조직으로</p>
-                      <Krw amount={trace.gross - agentTotal} className="text-xl font-semibold text-zinc-300" />
-                    </div>
-                  </div>
-                  <p className="text-center text-[12px] text-zinc-600 mt-5">
-                    관리자 오버라이딩은 전액 회사 귀속분 안에서 지급됩니다 — 본인 몫은 단 1원도 줄지 않습니다.
-                  </p>
-                </div>
-              );
-            })()}
+        {!loading && trace && (() => {
+          // ── 파생값: 답(Layer 0)을 위한 3구간 합산 ──────────────────────
+          const myTotal = shareAmt('agent') + shareAmt('agentBonus');
+          const orgTotal = shareAmt('teamLeader') + shareAmt('divHead') + shareAmt('branchPool');
+          const companyAmt = shareAmt('company');
+          const pctOf = (n: number) => (trace.gross > 0 ? (n / trace.gross) * 100 : 0);
+          const settled = trace.settlement ? trace.settlement.basePay + trace.settlement.bonusPay : null;
+          const matched = settled !== null && settled === myTotal;
+          const r = trace.recipients;
 
-            {/* 분해 흐름 */}
-            <div className="space-y-3">
-              {trace.breakdown.shares.map((s, i) => {
-                const st = SHARE_STYLE[s.key] ?? SHARE_STYLE.company;
-                return (
-                  <div
-                    key={s.key}
-                    className={`trace-row bg-[#11141a] border border-[#1f2430] rounded-xl px-6 py-5 ring-1 ring-inset ${st.ring}`}
-                    style={{ animationDelay: `${0.15 + i * 0.12}s` }}
+          return (
+            <div className="space-y-8">
+              {/* ── Layer 0 — 답: 화면을 열면 이것만 보인다 ───────────────── */}
+              <section className="bg-[#11141a] border border-[#1f2430] rounded-2xl p-8 text-center">
+                <p className="text-[13px] text-zinc-500">
+                  {trace.user.name}님의 {trace.yearMonth} 영업분 실수령 예상
+                </p>
+                <div className="mt-3">
+                  <Krw amount={myTotal} className="text-5xl font-bold text-emerald-400 tracking-tight" />
+                </div>
+                <p className="mt-3 text-[13px] text-zinc-500">
+                  계약 {trace.contracts.length}건 · 매출 총액 {fmt(trace.gross)}
+                </p>
+                {settled !== null && (
+                  matched ? (
+                    <span className="mt-3 inline-flex items-center rounded-full border border-emerald-700/50 bg-emerald-500/10 px-3 py-1 text-[12px] font-medium text-emerald-400">
+                      ✓ 확정 정산서와 일치
+                    </span>
+                  ) : (
+                    <span className="mt-3 inline-flex items-center rounded-full border border-amber-700/50 bg-amber-500/10 px-3 py-1 text-[12px] font-medium text-amber-400">
+                      ⚠ 정산서와 차이 있음
+                    </span>
+                  )
+                )}
+
+                {/* 한 줄짜리 분배 스택 바 — 이 화면의 유일한 시각화 */}
+                <div className="mt-7">
+                  <div className="flex h-3 w-full overflow-hidden rounded-full bg-[#0a0c10]">
+                    <div className="stack-seg h-full bg-emerald-500" style={{ width: `${pctOf(myTotal)}%` }} />
+                    <div className="stack-seg h-full bg-indigo-500" style={{ width: `${pctOf(orgTotal)}%` }} />
+                    <div className="stack-seg h-full bg-zinc-600" style={{ width: `${pctOf(companyAmt)}%` }} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+                    <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-500" />내 몫 {Math.round(pctOf(myTotal) * 10) / 10}%</span>
+                    <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-indigo-500" />관리 조직 {Math.round(pctOf(orgTotal) * 10) / 10}%</span>
+                    <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-zinc-600" />회사 {Math.round(pctOf(companyAmt) * 10) / 10}%</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setExpanded(v => !v)}
+                  className="mt-6 rounded-lg border border-[#1f2430] px-4 py-2 text-[13px] text-zinc-400 hover:text-white hover:border-indigo-500/50 transition-colors"
+                >
+                  {expanded ? '접기 ∧' : '계산 과정 펼쳐보기 ∨'}
+                </button>
+              </section>
+
+              {expanded && (
+                <>
+                  {/* ── Layer 1 — 명세서: 종이 급여명세서 문법 ──────────────── */}
+                  <section
+                    className="bg-[#11141a] border border-[#1f2430] rounded-2xl p-6 sm:p-8"
+                    style={{ fontVariantNumeric: 'tabular-nums' }}
                   >
-                    <div className="flex items-baseline justify-between mb-2 gap-4 flex-wrap">
-                      <div>
-                        <span className="text-[15px] font-semibold text-white">{s.label}</span>
-                        <span className="ml-2 text-[13px] text-zinc-500">→ {recipientName(s.key)}</span>
-                      </div>
-                      <div className="flex items-baseline gap-3">
-                        <Krw amount={s.amount} className={`text-xl font-bold ${st.text}`} />
-                        <span className="text-[13px] text-zinc-500 w-14 text-right">{s.pct}%</span>
-                      </div>
-                    </div>
-                    <div className="h-2 bg-[#0a0c10] rounded-full overflow-hidden">
-                      <div
-                        className={`trace-bar h-full rounded-full ${st.bar}`}
-                        style={{ width: `${(s.pct / maxPct) * 100}%`, animationDelay: `${0.25 + i * 0.12}s` }}
-                      />
-                    </div>
-                    <p className="mt-2 text-[12px] text-zinc-600">{s.formula}</p>
-                  </div>
-                );
-              })}
-            </div>
+                    <h2 className="text-[15px] font-semibold text-white">계산 명세 — {trace.yearMonth}</h2>
 
-            {/* 정산 확정 대조 — 추적기와 정산서가 일치함을 증명 */}
-            {trace.settlement && (
-              <div className="trace-row bg-[#0d1410] border border-emerald-900/40 rounded-xl px-6 py-5" style={{ animationDelay: '1s' }}>
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <p className="text-[14px] font-semibold text-emerald-300">✓ 정산서 교차 검증</p>
-                    <p className="text-[13px] text-zinc-500 mt-1">
-                      위 분해의 본인 몫(기본+지원비)과 {trace.yearMonth} 확정 정산서를 시스템이 자동 대조합니다.
+                    <p className="mt-5 text-[12px] font-semibold uppercase tracking-wider text-zinc-500">지급 내역</p>
+                    <div className="mt-1">
+                      <SpecRow label="기본 지급" sub={shareFormula('agent')} amount={shareAmt('agent')} />
+                      <SpecRow label="영업지원비" sub={shareFormula('agentBonus')} amount={shareAmt('agentBonus')} />
+                      <SpecRow label="본인 합계" amount={myTotal} bold amountClass="text-emerald-400" divider={false} />
+                    </div>
+
+                    <p className="mt-7 text-[12px] font-semibold uppercase tracking-wider text-zinc-500">
+                      조직 배분 <span className="normal-case font-normal text-zinc-600">(회사 귀속분에서 지급 — 본인 몫은 줄지 않습니다)</span>
                     </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[12px] text-zinc-500">확정 정산서 (기본+지원비)</p>
-                    <p className="text-lg font-bold text-emerald-400">₩ {(trace.settlement.basePay + trace.settlement.bonusPay).toLocaleString('ko-KR')}</p>
-                  </div>
-                </div>
-              </div>
-            )}
+                    <div className="mt-1">
+                      <SpecRow
+                        label="팀장 오버라이딩"
+                        sub={`→ ${r.teamLeader?.name ?? '(없음 → 회사 귀속)'}`}
+                        amount={shareAmt('teamLeader')}
+                      />
+                      <SpecRow
+                        label="본부장"
+                        sub={`→ ${r.divHead?.name ?? '(없음 → 회사 귀속)'}`}
+                        amount={shareAmt('divHead')}
+                      />
+                      <SpecRow
+                        label={r.branchMgrCount > 0 ? `지점장 풀 (${r.branchMgrCount}명 균등)` : '지점장 풀'}
+                        sub={r.branchMgrCount > 0 ? `→ ${r.branchMgrs.map(m => m.name).join(', ')}` : '→ (없음 → 회사 귀속)'}
+                        amount={shareAmt('branchPool')}
+                      />
+                      <SpecRow label="회사 운영분" sub="→ 자리 공인중개사 법인" amount={companyAmt} />
+                      <SpecRow label="매출 총액 (검산)" amount={trace.gross} bold amountClass="text-white" divider={false} />
+                    </div>
+                  </section>
 
-            {/* 원천 계약 목록 */}
-            {trace.contracts.length > 0 && (
-              <details className="trace-row bg-[#11141a] border border-[#1f2430] rounded-xl px-6 py-4" style={{ animationDelay: '1.1s' }}>
-                <summary className="cursor-pointer text-[14px] font-medium text-zinc-300 hover:text-white transition-colors">
-                  원천 계약 {trace.contracts.length}건 펼쳐보기
-                </summary>
-                <ul className="mt-4 space-y-2">
-                  {trace.contracts.map(c => (
-                    <li key={c.id} className="flex justify-between text-[13px] border-b border-[#1f2430] pb-2">
-                      <span className="text-zinc-400">
-                        {new Date(c.contractDate).toLocaleDateString('ko-KR')} · {c.contractType ?? '중개'} · {c.propertyAddress ?? '주소 미입력'}
-                      </span>
-                      <span className="text-zinc-200 font-medium">₩ {c.grossCommission.toLocaleString('ko-KR')}</span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </div>
-        )}
+                  {/* ── Layer 2 — 원천: 명세서의 근거가 된 실계약 ──────────── */}
+                  {trace.contracts.length > 0 && (
+                    <details className="bg-[#11141a] border border-[#1f2430] rounded-xl px-6 py-4">
+                      <summary className="cursor-pointer text-[14px] font-medium text-zinc-300 hover:text-white transition-colors">
+                        원천 계약 {trace.contracts.length}건 펼쳐보기
+                      </summary>
+                      <ul className="mt-4 space-y-2" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {trace.contracts.map(c => (
+                          <li key={c.id} className="flex justify-between text-[13px] border-b border-[#1f2430] pb-2">
+                            <span className="text-zinc-400">
+                              {new Date(c.contractDate).toLocaleDateString('ko-KR')} · {c.contractType ?? '중개'} · {c.propertyAddress ?? '주소 미입력'}
+                            </span>
+                            <span className="text-zinc-200 font-medium text-right">{fmt(c.grossCommission)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
 
         <footer className="pt-4 text-[12px] text-zinc-600">
           본 추적기의 계산 규칙은 정산 엔진과 단일 코어(commissionBreakdown)를 공유하며, 17개 자동 테스트가 매 빌드마다 100원 룰 준수를 검증합니다.

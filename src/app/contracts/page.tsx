@@ -8,6 +8,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import ContractForm from '@/components/contracts/ContractForm';
 import ContractTable from '@/components/contracts/ContractTable';
 
@@ -17,39 +18,42 @@ type User = {
   employeeId: string;
 };
 
+type Transaction = {
+  id: string;
+  role: string;
+  amount: number;
+  percentage: number;
+  recipient: { name: string };
+};
+
 type Contract = {
   id: string;
   grossCommission: number;
   contractDate: string;
   agent: User;
+  signatureStatus: string;
+  transactions?: Transaction[];
 };
 
-export default function ContractManagement() {
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
-  const fetchContracts = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/contracts?search=${encodeURIComponent(searchTerm)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setContracts(data.contracts || []);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+export default function ContractManagement() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchContracts();
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
     }, 400);
-    return () => clearTimeout(delayDebounceFn);
+    return () => clearTimeout(handler);
   }, [searchTerm]);
+
+  const { data, error, isLoading, mutate } = useSWR<{contracts: Contract[]}>(
+    `/api/contracts?search=${encodeURIComponent(debouncedSearch)}`,
+    fetcher
+  );
+
+  const contracts = data?.contracts || [];
 
   const handleDelete = async (id: string) => {
     if (!confirm('해당 계약을 취소/삭제 하시겠습니까?')) return;
@@ -59,7 +63,7 @@ export default function ContractManagement() {
         alert('삭제 처리 중 오류가 발생했습니다.');
         return;
       }
-      fetchContracts();
+      mutate();
     } catch (e) {
       alert('삭제에 실패했습니다.');
     }
@@ -74,11 +78,11 @@ export default function ContractManagement() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <ContractForm onContractAdded={fetchContracts} />
+          <ContractForm onContractAdded={mutate} />
           
           <ContractTable 
             contracts={contracts} 
-            loading={loading} 
+            loading={isLoading} 
             searchTerm={searchTerm} 
             onSearchChange={setSearchTerm} 
             onDelete={handleDelete} 

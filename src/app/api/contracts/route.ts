@@ -49,12 +49,6 @@ export async function POST(req: Request) {
     );
     return NextResponse.json(contract, { status: 201 });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: error.errors.map(e => e.message).join(', ') },
-        { status: 400 }
-      );
-    }
     return handleError(error);
   }
 }

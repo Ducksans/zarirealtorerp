@@ -22,6 +22,7 @@
 | `src/services/contractService.ts` | 계약(매출) 데이터 생성(100원 절사) 및 조회 비즈니스 로직 전담 |
 | `src/services/noticeService.ts` | 공지사항 게시판 데이터베이스 통신 및 비즈니스 로직 전담 |
 | `src/services/dashboardService.ts` | 대시보드 통계 및 정산 내역 조회용 비즈니스 로직 전담 |
+| `src/services/approvalService.ts` | 전자결재(M6) 파이프라인 관리 및 결재 승인/반려 비즈니스 로직 전담 |
 
 ## 3. 백엔드 컨트롤러 (src/app/api)
 | 파일명 | 책임 및 목적 |
@@ -32,6 +33,8 @@
 | `src/app/api/dashboard/route.ts` | 대시보드 통계 및 정산 내역 조회용 API 엔드포인트 |
 | `src/app/api/seed/route.ts` | 개발 및 테스트용 대규모 더미 데이터 생성 전담 라우트 |
 | `src/app/api/notices/route.ts` | 공지사항 관리 REST API 엔드포인트 |
+| `src/app/api/approvals/route.ts` | 전자결재(M6) 대기 목록 조회 API 엔드포인트 |
+| `src/app/api/approvals/[id]/route.ts` | 전자결재(M6) 승인 및 반려 처리 API 엔드포인트 |
 
 ## 4. 프론트엔드 라우트 (src/app)
 | 파일명 | 책임 및 목적 |
@@ -41,6 +44,7 @@
 | `src/app/hr/page.tsx` | 인사 관리 화면 진입점 (사번 검색 및 조직도 관리) |
 | `src/app/contracts/page.tsx` | 계약 관리 화면 진입점 (매출 실적 입력 및 조회) |
 | `src/app/notice/page.tsx` | 공지사항 게시판 화면 진입점 |
+| `src/app/hr/approvals/page.tsx` | 전자결재(M6) 화면 진입점 (결재선 진행 및 AI 멘토링 리포트 확인) |
 
 ## 5. UI 컴포넌트 (src/components)
 | 파일명 | 책임 및 목적 |

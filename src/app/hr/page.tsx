@@ -8,6 +8,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import UserForm from '@/components/hr/UserForm';
 import UserTable from '@/components/hr/UserTable';
 
@@ -21,44 +22,27 @@ type User = {
 };
 
 export default function HRManagement() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
-
-  // Pagination states
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-
-  // Modal state
   const [isFormVisible, setIsFormVisible] = useState(false);
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/users?search=${encodeURIComponent(searchTerm)}&role=${roleFilter}&status=${statusFilter}&page=${page}&limit=${limit}`);
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data.users || []);
-        setTotalCount(data.total || 0);
-        setTotalPages(data.totalPages || 1);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchUsers();
-    }, 400);
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, roleFilter, statusFilter, page, limit]);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const fetcher = (url: string) => fetch(url).then(r => r.json());
+  const queryUrl = `/api/users?search=${encodeURIComponent(debouncedSearch)}&role=${roleFilter}&status=${statusFilter}&page=${page}&limit=${limit}`;
+  const { data, error, isLoading: loading, mutate } = useSWR(queryUrl, fetcher);
+
+  const users = data?.users || [];
+  const totalCount = data?.total || 0;
+  const totalPages = data?.totalPages || 1;
 
   const handleDelete = async (id: string) => {
     if (!confirm('정말 이 직원을 삭제하시겠습니까? 관련 데이터가 꼬일 수 있습니다.')) return;
@@ -68,7 +52,7 @@ export default function HRManagement() {
         alert('삭제 처리 중 오류가 발생했습니다.');
         return;
       }
-      fetchUsers();
+      mutate();
     } catch (e) {
       alert('삭제에 실패했습니다.');
     }
@@ -121,7 +105,7 @@ export default function HRManagement() {
                   ✕ 닫기
                 </button>
                 <UserForm onUserAdded={() => {
-                  fetchUsers();
+                  mutate();
                   setIsFormVisible(false);
                 }} />
               </div>

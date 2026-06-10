@@ -23,7 +23,10 @@ export async function getContracts(search: string, page: number, limit: number) 
   const contracts = await prisma.contract.findMany({
     where,
     include: {
-      agent: { select: { name: true, role: true, employeeId: true } }
+      agent: { select: { name: true, role: true, employeeId: true } },
+      transactions: {
+        include: { recipient: { select: { name: true } } }
+      }
     },
     orderBy: { contractDate: 'desc' },
     skip: (page - 1) * limit,

@@ -10,14 +10,24 @@ import { NextResponse } from 'next/server';
 import { getDashboardData } from '@/services/dashboardService';
 import { handleError } from '@/lib/errorHandler';
 import { getCurrentYearMonth } from '@/lib/utils';
+import { z } from 'zod';
+
+const DashboardQuerySchema = z.object({
+  search: z.string().optional(),
+  yearMonth: z.string().regex(/^\d{4}-\d{2}$/, 'Invalid yearMonth format').optional(),
+});
 
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const search = url.searchParams.get('search') || '';
-    const yearMonth = url.searchParams.get('yearMonth') || getCurrentYearMonth();
+    const query = {
+      search: url.searchParams.get('search') || '',
+      yearMonth: url.searchParams.get('yearMonth') || getCurrentYearMonth(),
+    };
+    
+    const validated = DashboardQuerySchema.parse(query);
 
-    const { settlements, totalGross } = await getDashboardData(search, yearMonth);
+    const { settlements, totalGross } = await getDashboardData(validated.search || '', validated.yearMonth || getCurrentYearMonth());
 
     return NextResponse.json({ settlements, totalGross });
   } catch (error) {

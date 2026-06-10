@@ -22,10 +22,23 @@ export default function OnboardingWizard() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 실제로는 API 호출 (/api/onboarding) 후 처리
-    setIsSubmitted(true);
+    try {
+      const res = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      if (res.ok) {
+        setIsSubmitted(true);
+      } else {
+        const errorData = await res.json();
+        alert(`오류: ${errorData.error}`);
+      }
+    } catch (error) {
+      alert('네트워크 오류가 발생했습니다.');
+    }
   };
 
   if (isSubmitted) {

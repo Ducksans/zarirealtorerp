@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import useSWR from 'swr';
 
 type Notice = {
   id: string;
@@ -10,23 +11,12 @@ type Notice = {
   createdAt: string;
 };
 
+const fetcher = (url: string) => fetch(url).then(res => res.json());
+
 export default function NoticeBoard() {
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { data: notices, error, isLoading, mutate } = useSWR<Notice[]>('/api/notices', fetcher);
   const [formData, setFormData] = useState({ title: '', content: '' });
   const [isComposing, setIsComposing] = useState(false);
-
-  const fetchNotices = async () => {
-    setLoading(true);
-    const res = await fetch('/api/notices');
-    const data = await res.json();
-    if (Array.isArray(data)) setNotices(data);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchNotices();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,13 +30,13 @@ export default function NoticeBoard() {
     
     setFormData({ title: '', content: '' });
     setIsComposing(false);
-    fetchNotices();
+    mutate();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('이 게시글을 삭제하시겠습니까?')) return;
     await fetch(`/api/notices?id=${id}`, { method: 'DELETE' });
-    fetchNotices();
+    mutate();
   };
 
   return (
@@ -103,7 +93,10 @@ export default function NoticeBoard() {
 
         {/* Notice List */}
         <div className="space-y-4">
-          {notices.map((notice) => (
+          {error && <div className="text-red-400">데이터를 불러오는데 실패했습니다.</div>}
+          {isLoading && <div className="text-slate-400 animate-pulse">로딩 중...</div>}
+          
+          {!isLoading && !error && notices?.map((notice) => (
             <div key={notice.id} className="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-lg hover:border-slate-600 transition-colors relative group">
               <div className="flex justify-between items-start mb-4">
                 <h2 className="text-xl font-bold text-white">{notice.title}</h2>
@@ -122,7 +115,7 @@ export default function NoticeBoard() {
               </button>
             </div>
           ))}
-          {notices.length === 0 && !loading && (
+          {!isLoading && notices?.length === 0 && (
             <div className="bg-slate-800/50 rounded-xl p-12 border border-slate-700/50 text-center">
               <p className="text-slate-400">등록된 게시글이 없습니다.</p>
             </div>

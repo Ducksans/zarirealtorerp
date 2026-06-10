@@ -6,10 +6,20 @@
 
 'use client';
 
+import React, { useState } from 'react';
+
 type User = {
   id: string;
   name: string;
   employeeId: string;
+};
+
+type Transaction = {
+  id: string;
+  role: string;
+  amount: number;
+  percentage: number;
+  recipient: { name: string };
 };
 
 type Contract = {
@@ -17,6 +27,8 @@ type Contract = {
   grossCommission: number;
   contractDate: string;
   agent: User;
+  signatureStatus: string;
+  transactions?: Transaction[];
 };
 
 interface ContractTableProps {
@@ -28,6 +40,8 @@ interface ContractTableProps {
 }
 
 export default function ContractTable({ contracts, loading, searchTerm, onSearchChange, onDelete }: ContractTableProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   const formatKrw = (amount: number) => {
     return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount);
   };
@@ -52,38 +66,73 @@ export default function ContractTable({ contracts, loading, searchTerm, onSearch
             <tr>
               <th className="px-6 py-4 font-medium">계약일자</th>
               <th className="px-6 py-4 font-medium">담당 사원</th>
+              <th className="px-6 py-4 font-medium">결재 상태</th>
               <th className="px-6 py-4 font-medium text-right">총 중개보수</th>
               <th className="px-6 py-4 font-medium text-right">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50">
             {contracts.map((c) => (
-              <tr key={c.id} className="hover:bg-slate-800/50 transition-colors">
-                <td className="px-6 py-4 text-slate-400">{new Date(c.contractDate).toLocaleDateString()}</td>
-                <td className="px-6 py-4 font-medium text-white">
-                  {c.agent?.name} <span className="text-xs text-slate-500 block">{c.agent?.employeeId}</span>
-                </td>
-                <td className="px-6 py-4 text-right text-emerald-400 font-medium">{formatKrw(c.grossCommission)}</td>
-                <td className="px-6 py-4 text-right">
-                  <button 
-                    onClick={() => onDelete(c.id)}
-                    className="text-red-400 hover:text-red-300 transition-colors text-xs font-medium"
-                  >
-                    취소
-                  </button>
-                </td>
-              </tr>
+              <React.Fragment key={c.id}>
+                <tr className="hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
+                  <td className="px-6 py-4 text-slate-400">{new Date(c.contractDate).toLocaleDateString()}</td>
+                  <td className="px-6 py-4 font-medium text-white">
+                    {c.agent?.name} <span className="text-xs text-slate-500 block">{c.agent?.employeeId}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 text-xs rounded-full ${c.signatureStatus === 'SIGNED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                      {c.signatureStatus === 'SIGNED' ? '결재완료' : '결재대기'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right text-emerald-400 font-medium">{formatKrw(c.grossCommission)}</td>
+                  <td className="px-6 py-4 text-right">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}
+                      className="text-red-400 hover:text-red-300 transition-colors text-xs font-medium"
+                    >
+                      취소
+                    </button>
+                  </td>
+                </tr>
+                {expandedId === c.id && c.transactions && c.transactions.length > 0 && (
+                  <tr className="bg-slate-900/40">
+                    <td colSpan={5} className="px-6 py-4">
+                      <div className="text-xs text-slate-400 mb-2 font-medium">정산 내역 (수수료 배분)</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {c.transactions.map((t) => (
+                          <div key={t.id} className="flex justify-between items-center bg-slate-800 p-2 rounded border border-slate-700">
+                            <div>
+                              <span className="text-white font-medium">{t.recipient.name}</span>
+                              <span className="text-slate-500 ml-2">({t.role})</span>
+                            </div>
+                            <div className="text-emerald-400 font-medium">
+                              {formatKrw(t.amount)} <span className="text-slate-500 font-normal text-[10px]">({t.percentage}%)</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {expandedId === c.id && (!c.transactions || c.transactions.length === 0) && (
+                  <tr className="bg-slate-900/40">
+                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-slate-500">
+                      정산 내역이 없습니다. (월 마감 전)
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
             {contracts.length === 0 && !loading && (
               <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
                   등록된 매출 내역이 없거나 검색 결과가 없습니다.
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                   데이터를 불러오는 중입니다...
                 </td>
               </tr>

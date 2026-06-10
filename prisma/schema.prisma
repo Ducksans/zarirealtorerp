@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -74,6 +74,11 @@ model User {
   settlements Settlement[]
   documents   UserDocument[]
   roleHistory UserRoleHistory[]
+  
+  // Relations for new models
+  receivedTransactions SettlementTransaction[] @relation("SettlementRecipient")
+  sourcedTransactions  SettlementTransaction[] @relation("SettlementSource")
+  verifiedListings     VerifiedListing[]
 }
 
 model UserDocument {
@@ -96,7 +101,7 @@ model UserRoleHistory {
 model Contract {
   id               String   @id @default(cuid())
   agentId          String
-  agent            User     @relation(fields: [agentId], references: [id])
+  agent            User     @relation(fields: [agentId], references: [id], onDelete: Restrict)
   grossCommission  Int      // 부가세 별도 총액
   contractDate     DateTime @default(now())
   
@@ -105,12 +110,17 @@ model Contract {
   signatureDate    DateTime?
   paymentStatus    String   @default("PENDING") // PENDING, PAID, NON_PAID
   paymentDate      DateTime?
+  
+  transactions     SettlementTransaction[]
+
+  @@index([agentId])
+  @@index([contractDate])
 }
 
 model Settlement {
   id          String   @id @default(uuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict)
   yearMonth   String
   basePay     Int
   bonusPay    Int
@@ -124,6 +134,8 @@ model Settlement {
   paymentDate      DateTime?
   
   createdAt   DateTime @default(now())
+
+  @@index([userId, yearMonth])
 }
 
 model AuditLog {
@@ -136,6 +148,10 @@ model AuditLog {
   afterData  String?  // 수정 후 데이터 (JSON String)
   reason     String?  // 수정 사유
   createdAt  DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([actorId])
+  @@index([createdAt])
 }
 
 model Notice {
@@ -181,3 +197,55 @@ model OnboardingRequest {
   updatedAt       DateTime @updatedAt
 }
 
+// -----------------------------------------
+// Trust Infrastructure: Dual Flywheel Models
+// -----------------------------------------
+
+// 1. 100-won Override Logic Transparency
+model SettlementTransaction {
+  id              String   @id @default(uuid())
+  contractId      String
+  contract        Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  recipientId     String
+  recipient       User     @relation("SettlementRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+  
+  sourceUserId    String?
+  sourceUser      User?    @relation("SettlementSource", fields: [sourceUserId], references: [id], onDelete: SetNull)
+  
+  role            String   // e.g. "AGENT", "TEAM_LEADER", "DIV_HEAD", "BRANCH_MGR", "COMPANY"
+  amount          Int      // The actual distributed amount
+  percentage      Float    // The percentage of the total commission
+  
+  createdAt       DateTime @default(now())
+
+  @@index([contractId])
+  @@index([recipientId])
+  @@index([sourceUserId])
+}
+
+// 2. Verified Listing (Customer Trust Engine)
+model VerifiedListing {
+  id              String   @id @default(uuid())
+  agentId         String
+  agent           User     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  title           String
+  address         String
+  price           Int
+  
+  // Trust signals
+  latitude        Float?
+  longitude       Float?
+  verifiedAt      DateTime?
+  photoUrl        String?
+  
+  // Status: "PENDING", "VERIFIED", "REJECTED"
+  status          String   @default("PENDING")
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([status])
+}

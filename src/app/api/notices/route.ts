@@ -18,12 +18,20 @@ export async function GET() {
   }
 }
 
+import { z } from 'zod';
+
+const CreateNoticeSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(100, 'Title is too long'),
+  content: z.string().min(1, 'Content is required'),
+  authorId: z.string().optional(),
+});
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { title, content, authorId } = body;
+    const validated = CreateNoticeSchema.parse(body);
     
-    const notice = await createNotice(title, content, authorId);
+    const notice = await createNotice(validated.title, validated.content, validated.authorId);
     return NextResponse.json(notice, { status: 201 });
   } catch (error) {
     return handleError(error);

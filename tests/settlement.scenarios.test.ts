@@ -143,6 +143,22 @@ describe('100원 룰 — 단건 분배의 정의 (SSOT_Commission_100won_Rule.md
   });
 });
 
+describe('월 정산 범위 — 해당 월 계약만 포함 (중복 정산 차단, 2026-06-11 실데이터 검증 결함 수정)', () => {
+  it('지난달 계약은 이번 달 정산에 포함되지 않는다', async () => {
+    const org = await seedOrg({ regulars: { count: 1, revenue: 600 * 만 }, teamLeaders: { count: 0, revenue: 0 } });
+    // 같은 직원의 "지난달" 계약 추가 — 이번 달 정산에 섞이면 안 된다
+    const lastMonth = new Date();
+    lastMonth.setUTCMonth(lastMonth.getUTCMonth() - 1);
+    await prisma.contract.create({
+      data: { agentId: org.regulars[0].id, grossCommission: 1000 * 만, contractDate: lastMonth },
+    });
+
+    const r = await settle();
+    // 이번 달 600만 계약만 정산: 300만 + 30만 = 330만 (지난달 1,000만은 제외)
+    expect(r.byRole(ROLES.REGULAR)[0].totalPay).toBe(330 * 만);
+  });
+});
+
 describe('영업지원비 계단식 — 구간 돌파 동기부여 설계 (2026-06-11 대표 확언)', () => {
   // "계단식으로 책정해야 구간을 넘어서려는 노력을 한다. 1,000만 초과는 흔치 않으니 격려 차원에서 15%"
   it('회사귀속분 100만 미만 → 지원비 0원', async () => {

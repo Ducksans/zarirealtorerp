@@ -27,12 +27,20 @@ function getBonus(companyRev: number): number {
 }
 
 export async function processMonthlySettlement(yearMonth: string) {
+  // 월 정산 범위: 해당 월(yearMonth)에 체결된 계약만 포함
+  // (필터 부재 시 과거 계약이 매달 중복 정산되는 치명 결함 — 2026-06-11 실데이터 검증에서 적발)
+  const monthStart = new Date(`${yearMonth}-01T00:00:00Z`);
+  const monthEnd = new Date(monthStart);
+  monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
+
   // CRITICAL-04: Interactive Transaction으로 읽기부터 쓰기까지 원자적 보장
   return await prisma.$transaction(async (tx) => {
-    // 1. 트랜잭션 내에서 유저 및 계약 정보 조회
+    // 1. 트랜잭션 내에서 유저 및 해당 월 계약 정보 조회
     const [users, contracts] = await Promise.all([
       tx.user.findMany(),
-      tx.contract.findMany()
+      tx.contract.findMany({
+        where: { contractDate: { gte: monthStart, lt: monthEnd } }
+      })
     ]);
 
     const numBranchMgrs = users.filter(u => u.role === ROLES.BRANCH_MGR).length;

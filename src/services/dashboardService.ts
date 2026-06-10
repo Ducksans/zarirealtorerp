@@ -33,8 +33,14 @@ export async function getDashboardData(search: string, yearMonth: string) {
   });
 
   // HIGH-02: aggregate로 DB엔진이 SUM 수행 (O(1) 네트워크)
+  // 해당 월(yearMonth)의 계약 매출만 집계 — 정산 화면의 "이달 총매출"과 정산 내역의 기준 월을 일치시킴
+  const monthStart = new Date(`${yearMonth}-01T00:00:00Z`);
+  const monthEnd = new Date(monthStart);
+  monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
+
   const aggregation = await prisma.contract.aggregate({
-    _sum: { grossCommission: true }
+    _sum: { grossCommission: true },
+    where: { contractDate: { gte: monthStart, lt: monthEnd } }
   });
   const totalGross = aggregation._sum.grossCommission || 0;
 

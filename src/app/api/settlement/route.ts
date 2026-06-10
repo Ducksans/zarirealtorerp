@@ -17,13 +17,24 @@ import { NextResponse } from 'next/server';
 import { processMonthlySettlement } from '@/lib/settlementService';
 import { handleError } from '@/lib/errorHandler';
 import { getCurrentYearMonth } from '@/lib/utils';
+import { z } from 'zod';
+
+const RunSettlementSchema = z.object({
+  yearMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'yearMonth는 YYYY-MM 형식이어야 합니다.').optional()
+});
 
 export async function POST(req: Request) {
   try {
-    const yearMonth = getCurrentYearMonth();
+    const body = await req.json().catch(() => ({}));
+    const validated = RunSettlementSchema.parse(body);
+    const yearMonth = validated.yearMonth ?? getCurrentYearMonth();
+
     const settlements = await processMonthlySettlement(yearMonth);
-    return NextResponse.json({ message: 'Settlement processed successfully', count: settlements.length });
+    return NextResponse.json({ message: 'Settlement processed successfully', yearMonth, count: settlements.length });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues.map(e => e.message).join(', ') }, { status: 400 });
+    }
     return handleError(error);
   }
 }

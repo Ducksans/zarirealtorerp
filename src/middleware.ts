@@ -15,19 +15,17 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // 1. /dev 경로로 시작하는 모든 요청을 가로챕니다.
-  if (request.nextUrl.pathname.startsWith('/dev')) {
-    
-    // 2. 임시 인증 로직: 쿠키나 헤더에 마스터 키가 있는지 확인합니다.
-    // (실제 프로덕션에서는 JWT 토큰이나 세션 검증 로직이 들어갑니다.)
+  const { pathname } = request.nextUrl;
+
+  // /dev(관제탑)와 /admin(관리자 화면) 경로를 보호합니다.
+  // [M2 선행 가드] 실제 세션 기반 RBAC는 Work_Queue #5(M2 인증)에서 교체 예정.
+  // 프로덕션이 아닌 로컬 환경에서는 개발 편의를 위해 접속을 허용합니다 (대표님 지시).
+  if (pathname.startsWith('/dev') || pathname.startsWith('/admin')) {
     const masterKey = request.cookies.get('MASTER_SYNC_KEY');
-    
-    // 3. 로컬 환경 개발 편의를 위한 인증 하향 (대표님 지시)
-    // 프로덕션(배포) 환경이 아닐 경우(로컬) 즉각 접속을 허용합니다.
     const isLocal = process.env.NODE_ENV !== 'production';
-    
+
     if (!isLocal && (!masterKey || masterKey.value !== 'deoksan-neural-sync-2026')) {
-      console.warn('⚠️ [보안 경고] 비인가자의 /dev 대시보드 접근 시도 차단됨');
+      console.warn(`⚠️ [보안 경고] 비인가자의 ${pathname} 접근 시도 차단됨`);
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
@@ -37,5 +35,5 @@ export function middleware(request: NextRequest) {
 
 // 미들웨어가 작동할 경로를 명시적으로 지정합니다.
 export const config = {
-  matcher: ['/dev/:path*'],
+  matcher: ['/dev/:path*', '/admin/:path*'],
 };

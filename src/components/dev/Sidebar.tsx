@@ -140,7 +140,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div key={subName} className="mt-1 pl-2 border-l border-[#27272a] ml-2 space-y-0.5">
         <button 
           onClick={() => toggleSub(subName)} 
-          className="w-full text-left px-2 py-1.5 text-[11px] font-semibold text-[#a1a1aa] hover:text-[#fafafa] hover:bg-[#18181b] rounded transition-colors flex justify-between group"
+          className="w-full text-left px-2 py-1.5 text-[12px] font-semibold text-[#b4bac4] hover:text-[#fafafa] hover:bg-[#18181b] rounded transition-colors flex justify-between group"
         >
           <span className="group-hover:text-[#fafafa]">📁 {subName}</span>
           <span>{isSubExpanded ? '▼' : '▶'}</span>
@@ -163,7 +163,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div key={folderKey} className="mt-1 mb-1">
                 <button 
                   onClick={() => toggleL3(folderKey)}
-                  className={`w-full text-left px-2 py-1 text-[11px] font-bold ${colorClass} hover:brightness-150 transition-colors flex justify-between tracking-wide`}
+                  className={`w-full text-left px-2 py-1 text-[12px] font-bold ${colorClass} hover:brightness-150 transition-colors flex justify-between tracking-wide`}
                 >
                   <span className="truncate">📂 [{msKeyword}][{typeKeyword}] {folderLabel}</span>
                   <span>{isL3Expanded ? '▼' : '▶'}</span>
@@ -205,7 +205,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   key={node.id}
                   ref={isSelected ? selectedRef : null}
                   onClick={() => handleNodeClick(node)}
-                  className={`w-full text-left px-2 py-1.5 text-[12px] rounded transition-all truncate border ${isSelected ? 'bg-[#18181b] text-[#fafafa] font-medium border-[#3f3f46]' : 'border-transparent hover:bg-[#18181b] text-[#a1a1aa] hover:text-[#d4d4d8]'}`}
+                  className={`w-full text-left px-2 py-1.5 text-[13px] rounded transition-all truncate border ${isSelected ? 'bg-[#18181b] text-[#fafafa] font-medium border-[#3f3f46]' : 'border-transparent hover:bg-[#18181b] text-[#c2c7d0] hover:text-[#fafafa]'}`}
                   title={displayName}
                 >
                   <span className="mr-1 opacity-80">{icon}</span> {displayContent}

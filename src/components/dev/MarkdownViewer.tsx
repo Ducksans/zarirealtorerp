@@ -187,31 +187,60 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
   return (
     // ★ 1) 가장 바깥 컨테이너는 전체 높이를 고정하고 넘치는 것을 숨깁니다.
     <div className="relative flex flex-row w-full h-full bg-[#09090b] overflow-hidden text-[#d4d4d8]">
-      {/* ── 글로벌 타이포그래피 스타일 (Premium) ── */}
+      {/* ── 글로벌 타이포그래피 (2026-06-11 가독성 개편: 한국어 최적화) ── */}
       <style dangerouslySetInnerHTML={{__html:`
         .markdown-body {
-          font-family: var(--font-inter), sans-serif;
-          color: #d4d4d8;
-          line-height: 1.75;
-          font-size: 1rem;
+          font-family: var(--font-inter), 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+          color: #cdd2da;
+          line-height: 1.9;
+          font-size: 1.0625rem;
+          word-break: keep-all;          /* 한국어 어절 단위 줄바꿈 */
+          overflow-wrap: break-word;
         }
-        .markdown-body h1 { font-size: 2.25rem; margin-top: 1rem; margin-bottom: 2rem; font-weight: 600; color: #fafafa; letter-spacing: -0.03em; }
-        .markdown-body h2 { font-size: 1.5rem; margin-top: 3.5rem; margin-bottom: 1.5rem; font-weight: 600; color: #fafafa; letter-spacing: -0.02em; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.5rem;}
-        .markdown-body h3 { font-size: 1.25rem; margin-top: 2.5rem; margin-bottom: 1rem; font-weight: 500; color: #f4f4f5; letter-spacing: -0.01em; }
-        .markdown-body p { margin-bottom: 1.5rem; color: #a1a1aa; }
-        .markdown-body ul { list-style-type: none; padding-left: 0; margin-bottom: 1.5rem; }
-        .markdown-body ul li { position: relative; padding-left: 1.5rem; margin-bottom: 0.75rem; color: #a1a1aa; }
-        .markdown-body ul li::before { content: "•"; position: absolute; left: 0; color: #52525b; font-weight: bold; }
-        .markdown-body code { background-color: #18181b; border: 1px solid #27272a; border-radius: 6px; padding: 0.2em 0.4em; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.875em; color: #e4e4e7; }
-        .markdown-body pre { background-color: #18181b; padding: 1.25rem; overflow-x: auto; font-size: 0.875em; line-height: 1.6; border-radius: 12px; border: 1px solid #27272a; margin-bottom: 2rem; }
-        .markdown-body pre code { background-color: transparent; border: none; padding: 0; color: #e4e4e7; font-size: 1em; }
-        .markdown-body blockquote { padding: 1rem 1.5rem; color: #a1a1aa; border-left: 4px solid #3f3f46; margin-bottom: 2rem; background-color: #18181b; border-radius: 0 12px 12px 0; font-style: italic; }
-        .markdown-body strong { font-weight: 600; color: #fafafa; }
-        .markdown-body a { color: #fafafa; text-decoration: underline; text-underline-offset: 4px; decoration-color: #52525b; transition: all 0.2s; }
-        .markdown-body a:hover { text-decoration-color: #fafafa; }
-        .markdown-body table { border-collapse: collapse; width: 100%; margin-bottom: 2rem; font-size: 0.875rem; border-radius: 12px; overflow: hidden; }
-        .markdown-body th, .markdown-body td { border: 1px solid #27272a; padding: 1rem; text-align: left; }
-        .markdown-body th { background-color: #18181b; color: #fafafa; font-weight: 500; }
+        .markdown-body h1 { font-size: 2rem; margin-top: 0.5rem; margin-bottom: 1.75rem; font-weight: 700; color: #fafafa; letter-spacing: -0.02em; line-height: 1.4; }
+        .markdown-body h2 { font-size: 1.45rem; margin-top: 3rem; margin-bottom: 1.25rem; font-weight: 650; color: #fafafa; letter-spacing: -0.01em; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem; line-height: 1.5; }
+        .markdown-body h3 { font-size: 1.2rem; margin-top: 2.25rem; margin-bottom: 0.875rem; font-weight: 600; color: #f4f4f5; line-height: 1.5; }
+        .markdown-body h4 { font-size: 1.05rem; margin-top: 1.75rem; margin-bottom: 0.75rem; font-weight: 600; color: #e4e7ec; }
+        .markdown-body p { margin-bottom: 1.4rem; color: #b8bec8; }
+        .markdown-body ul, .markdown-body ol { padding-left: 0.25rem; margin-bottom: 1.5rem; }
+        .markdown-body ul { list-style-type: none; }
+        .markdown-body ol { list-style-position: inside; }
+        .markdown-body li { position: relative; padding-left: 1.4rem; margin-bottom: 0.6rem; color: #b8bec8; }
+        .markdown-body ol li { padding-left: 0.2rem; }
+        .markdown-body ul li::before { content: "•"; position: absolute; left: 0.2rem; color: #818694; font-weight: bold; }
+        .markdown-body li > ul, .markdown-body li > ol { margin-top: 0.6rem; margin-bottom: 0; }
+        .markdown-body code { background-color: #1b1e25; border: 1px solid #2c303a; border-radius: 6px; padding: 0.15em 0.45em; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; color: #e8eaf0; }
+        .markdown-body pre { background-color: #14161c; padding: 1.25rem 1.5rem; overflow-x: auto; font-size: 0.875rem; line-height: 1.7; border-radius: 12px; border: 1px solid #2c303a; margin-bottom: 2rem; }
+        .markdown-body pre code { background-color: transparent; border: none; padding: 0; font-size: 1em; }
+        .markdown-body strong { font-weight: 700; color: #fafafa; }
+        .markdown-body a { color: #8ab4ff; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: rgba(138,180,255,0.4); transition: all 0.2s; }
+        .markdown-body a:hover { text-decoration-color: #8ab4ff; }
+        .markdown-body hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 2.5rem 0; }
+
+        /* 표: 줄무늬 + 명확한 대비 */
+        .markdown-body table { border-collapse: collapse; width: 100%; margin-bottom: 2rem; font-size: 0.9rem; line-height: 1.65; border: 1px solid #2c303a; border-radius: 12px; overflow: hidden; display: block; overflow-x: auto; }
+        .markdown-body th, .markdown-body td { border: 1px solid #262a33; padding: 0.7rem 1rem; text-align: left; word-break: keep-all; }
+        .markdown-body th { background-color: #1d212a; color: #fafafa; font-weight: 600; white-space: nowrap; }
+        .markdown-body td { color: #c4cad4; }
+        .markdown-body tbody tr:nth-child(even) td { background-color: rgba(255,255,255,0.025); }
+        .markdown-body tbody tr:hover td { background-color: rgba(138,180,255,0.05); }
+
+        /* 인용구: 이탤릭 제거 (한국어 가독성), 콜아웃은 색상 박스 */
+        .markdown-body blockquote { padding: 1rem 1.5rem; color: #b8bec8; border-left: 4px solid #4b5160; margin-bottom: 2rem; background-color: #14161c; border-radius: 0 12px 12px 0; font-style: normal; }
+        .markdown-body blockquote p { margin-bottom: 0.6rem; }
+        .markdown-body blockquote p:last-child { margin-bottom: 0; }
+        .markdown-body .callout { border-radius: 12px; }
+        .markdown-body .callout-label { display: block; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.02em; margin-bottom: 0.5rem; }
+        .markdown-body .callout-note      { border-left-color: #4c8dff; background-color: rgba(76,141,255,0.07); }
+        .markdown-body .callout-note      .callout-label { color: #8ab4ff; }
+        .markdown-body .callout-tip       { border-left-color: #34d399; background-color: rgba(52,211,153,0.07); }
+        .markdown-body .callout-tip       .callout-label { color: #6ee7b7; }
+        .markdown-body .callout-important { border-left-color: #a78bfa; background-color: rgba(167,139,250,0.08); }
+        .markdown-body .callout-important .callout-label { color: #c4b5fd; }
+        .markdown-body .callout-warning   { border-left-color: #fbbf24; background-color: rgba(251,191,36,0.07); }
+        .markdown-body .callout-warning   .callout-label { color: #fcd34d; }
+        .markdown-body .callout-caution   { border-left-color: #f87171; background-color: rgba(248,113,113,0.07); }
+        .markdown-body .callout-caution   .callout-label { color: #fca5a5; }
         .text-accent { color: #fafafa; }
       `}} />
 
@@ -220,7 +249,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
         ref={scrollContainerRef}
         className="md-scroll flex-1 min-w-0 overflow-y-auto overflow-x-hidden relative h-full"
       >
-        <div className="max-w-3xl mx-auto px-8 py-16">
+        <div className="max-w-[52rem] mx-auto px-10 py-14">
           {breadcrumbs}
           <div
             ref={contentRef}

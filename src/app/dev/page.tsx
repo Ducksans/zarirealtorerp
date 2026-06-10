@@ -72,24 +72,38 @@ export default function DevDashboard() {
           const endIdx = content.indexOf('---', 3);
           if (endIdx !== -1) {
             const fmText = content.substring(3, endIdx).trim();
-            content = content.substring(endIdx + 3).trim(); 
-            
-            const fmLines = fmText.split('\n');
-            const badges = fmLines.map((line: string) => {
+            content = content.substring(endIdx + 3).trim();
+
+            // [가독성 개편] 키-값 칩 나열 대신 정돈된 문서 헤더 카드로 렌더링
+            const fm: Record<string, string> = {};
+            fmText.split('\n').forEach((line: string) => {
               const colonIdx = line.indexOf(':');
-              if (colonIdx !== -1) {
-                const key = line.substring(0, colonIdx).trim().replace(/['"]/g, '');
-                const val = line.substring(colonIdx + 1).trim().replace(/['"]/g, '');
-                if (key === 'backlinks') return ''; 
-                return `<span class="inline-flex items-center rounded-md bg-slate-800/50 px-2.5 py-1 text-xs font-semibold text-slate-300 ring-1 ring-inset ring-slate-600/50 mr-2 mb-2">
-                          <span class="mr-1.5 text-slate-500 uppercase text-[10px] tracking-wider">${key}</span> ${val}
-                        </span>`;
-              }
-              return '';
-            }).join('');
-            
-            frontmatterHtml = `<div class="mb-8 pb-4 border-b border-[#30363d]/50">
-                                 <div class="flex flex-wrap">${badges}</div>
+              if (colonIdx === -1) return;
+              const key = line.substring(0, colonIdx).trim().replace(/['"]/g, '');
+              fm[key] = line.substring(colonIdx + 1).trim().replace(/['"]/g, '');
+            });
+
+            const chip = (label: string, val?: string, cls = 'bg-slate-800/60 text-slate-300 ring-slate-600/40') =>
+              val ? `<span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium ring-1 ring-inset ${cls}">
+                       <span class="opacity-60 uppercase text-[10px] tracking-wider">${label}</span>${val}
+                     </span>` : '';
+
+            const chips = [
+              chip('마일스톤', fm.milestone, 'bg-indigo-500/10 text-indigo-300 ring-indigo-500/30'),
+              chip('유형', fm.type, 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/30'),
+              chip('작성일', fm.date),
+              chip('ID', fm.id),
+            ].filter(Boolean).join('');
+
+            const whyBlock = fm.why
+              ? `<p class="mt-4 text-[14px] leading-relaxed text-slate-400 border-l-2 border-slate-600 pl-3">
+                   <span class="font-semibold text-slate-300">작성 목적</span> · ${fm.why}
+                 </p>`
+              : '';
+
+            frontmatterHtml = `<div class="mb-10 pb-6 border-b border-white/10">
+                                 <div class="flex flex-wrap gap-2">${chips}</div>
+                                 ${whyBlock}
                                </div>`;
           }
         }
@@ -99,10 +113,28 @@ export default function DevDashboard() {
           return `<button class="wiki-link bg-blue-900/20 text-[#58a6ff] hover:text-white hover:bg-blue-600/50 px-1 py-0.5 rounded font-mono font-bold transition-colors cursor-pointer border border-[#58a6ff]/30" data-id="${linkId}">[[${p1}]]</button>`;
         });
 
+        // [가독성 개편] GitHub식 [!NOTE] 인용구를 색상 콜아웃 박스로 변환
+        const applyCallouts = (html: string) => {
+          const STYLES: Record<string, { icon: string; label: string; cls: string }> = {
+            NOTE:      { icon: '📘', label: '참고',  cls: 'callout-note' },
+            TIP:       { icon: '💡', label: '팁',    cls: 'callout-tip' },
+            IMPORTANT: { icon: '📌', label: '중요',  cls: 'callout-important' },
+            WARNING:   { icon: '⚠️', label: '경고',  cls: 'callout-warning' },
+            CAUTION:   { icon: '🚨', label: '주의',  cls: 'callout-caution' },
+          };
+          return html.replace(
+            /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(<br\s*\/?>)?/g,
+            (_m, kind: string) => {
+              const s = STYLES[kind];
+              return `<blockquote class="callout ${s.cls}"><p><span class="callout-label">${s.icon} ${s.label}</span>`;
+            }
+          );
+        };
+
         // @ts-ignore
         if (window.marked) {
           // @ts-ignore
-          setHtmlContent(frontmatterHtml + window.marked.parse(content));
+          setHtmlContent(frontmatterHtml + applyCallouts(window.marked.parse(content)));
         } else {
           setHtmlContent(frontmatterHtml + `<pre style="white-space: pre-wrap;">${content}</pre>`);
         }

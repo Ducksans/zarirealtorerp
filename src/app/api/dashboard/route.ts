@@ -1,3 +1,10 @@
+/*---
+id: route.ts
+milestone: M0
+why: API 라우트 엔드포인트 (route.ts)
+backlinks: [[[API_Routes]]]
+---*/
+
 /**
  * @file src/app/api/dashboard/route.ts
  * @description 대시보드 데이터 조회 API 엔드포인트 (Controller)

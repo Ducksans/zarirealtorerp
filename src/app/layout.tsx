@@ -1,7 +1,14 @@
+/*---
+id: layout.tsx
+milestone: M0
+why: 기본 구조 파일 (layout.tsx)
+backlinks: []
+---*/
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import DevHeader from '@/components/dev/DevHeader';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,8 +35,8 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <Navbar />
+      <body className="h-full flex flex-col overflow-hidden">
+        <DevHeader />
         {children}
       </body>
     </html>

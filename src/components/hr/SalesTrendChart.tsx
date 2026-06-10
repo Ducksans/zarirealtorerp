@@ -1,3 +1,10 @@
+/*---
+id: SalesTrendChart.tsx
+milestone: M0
+why: 기본 구조 파일 (SalesTrendChart.tsx)
+backlinks: []
+---*/
+
 'use client';
 
 import { useMemo } from 'react';

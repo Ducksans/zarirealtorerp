@@ -1,3 +1,10 @@
+/*---
+id: ContractForm.tsx
+milestone: M0
+why: 기본 구조 파일 (ContractForm.tsx)
+backlinks: []
+---*/
+
 /**
  * @file src/components/contracts/ContractForm.tsx
  * @description 계약(매출) 관리 - 신규 매출 등록 폼 컴포넌트

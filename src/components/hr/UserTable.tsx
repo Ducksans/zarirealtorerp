@@ -1,3 +1,10 @@
+/*---
+id: UserTable.tsx
+milestone: M0
+why: 기본 구조 파일 (UserTable.tsx)
+backlinks: []
+---*/
+
 /**
  * @file src/components/hr/UserTable.tsx
  * @description 인사 관리 - 직원 목록 및 조직도 테이블 컴포넌트

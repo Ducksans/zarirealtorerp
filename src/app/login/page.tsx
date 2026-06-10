@@ -1,12 +1,28 @@
+/*---
+id: page.tsx
+milestone: M0
+why: 페이지 UI 진입점 (page.tsx)
+backlinks: [[[Pages]]]
+---*/
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function RecruitmentLandingPage() {
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberId, setRememberId] = useState(false);
+
+  useEffect(() => {
+    const savedId = localStorage.getItem('savedEmployeeId');
+    if (savedId) {
+      setEmployeeId(savedId);
+      setRememberId(true);
+    }
+  }, []);
   const router = useRouter();
 
   const handleLogin = (e: React.FormEvent) => {
@@ -14,8 +30,17 @@ export default function RecruitmentLandingPage() {
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      router.push('/');
-    }, 1500);
+      if (employeeId === 'EMP-0000' && password === 'diamond') {
+        if (rememberId) {
+          localStorage.setItem('savedEmployeeId', employeeId);
+        } else {
+          localStorage.removeItem('savedEmployeeId');
+        }
+        router.push('/');
+      } else {
+        alert('사번 또는 비밀번호가 올바르지 않습니다. (데모 계정: EMP-0000 / diamond)');
+      }
+    }, 800);
   };
 
   return (
@@ -44,11 +69,11 @@ export default function RecruitmentLandingPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4">
-            <button className="px-8 py-4 bg-slate-900/80 border border-slate-700 hover:border-indigo-500/50 rounded-2xl text-slate-200 font-bold transition-all shadow-xl hover:shadow-indigo-500/10 flex items-center justify-center gap-3 group">
+            <button onClick={() => router.push('/admin/settlements')} className="px-8 py-4 bg-slate-900/80 border border-slate-700 hover:border-indigo-500/50 rounded-2xl text-slate-200 font-bold transition-all shadow-xl hover:shadow-indigo-500/10 flex items-center justify-center gap-3 group">
               <span className="text-2xl group-hover:scale-110 transition-transform">💻</span>
               ERP 데모 구경하기
             </button>
-            <button className="px-8 py-4 bg-slate-900/80 border border-slate-700 hover:border-emerald-500/50 rounded-2xl text-slate-200 font-bold transition-all shadow-xl hover:shadow-emerald-500/10 flex items-center justify-center gap-3 group">
+            <button onClick={() => router.push('/rulebook')} className="px-8 py-4 bg-slate-900/80 border border-slate-700 hover:border-emerald-500/50 rounded-2xl text-slate-200 font-bold transition-all shadow-xl hover:shadow-emerald-500/10 flex items-center justify-center gap-3 group">
               <span className="text-2xl group-hover:scale-110 transition-transform">📖</span>
               회사 규정집 (보상/진급) 원문 보기
             </button>
@@ -99,6 +124,21 @@ export default function RecruitmentLandingPage() {
                   className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
                   required
                 />
+              </div>
+
+              <div className="flex items-center">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <div className="relative flex items-center justify-center">
+                    <input 
+                      type="checkbox" 
+                      checked={rememberId}
+                      onChange={e => setRememberId(e.target.checked)}
+                      className="peer appearance-none w-5 h-5 border border-slate-600 rounded bg-slate-900/50 checked:bg-indigo-500 checked:border-indigo-500 transition-colors"
+                    />
+                    <span className="absolute text-white opacity-0 peer-checked:opacity-100 pointer-events-none text-xs">✓</span>
+                  </div>
+                  <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">아이디 저장</span>
+                </label>
               </div>
 
               <div className="pt-2">

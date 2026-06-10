@@ -1,3 +1,10 @@
+/*---
+id: SummaryCards.tsx
+milestone: M0
+why: 기본 구조 파일 (SummaryCards.tsx)
+backlinks: []
+---*/
+
 /**
  * @file src/components/dashboard/SummaryCards.tsx
  * @description 대시보드 최상단 요약 카드(매출, 수익, 마진율) 컴포넌트

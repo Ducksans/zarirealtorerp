@@ -1,3 +1,10 @@
+/*---
+id: auditService.ts
+milestone: M0
+why: 기본 구조 파일 (auditService.ts)
+backlinks: []
+---*/
+
 /**
  * @file src/services/auditService.ts
  * @description 엔티티의 CUD 작업 발생 시 이력을 추적하는 범용 서비스

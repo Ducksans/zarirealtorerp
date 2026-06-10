@@ -1,3 +1,10 @@
+/*---
+id: AuditLogTimeline.tsx
+milestone: M0
+why: 기본 구조 파일 (AuditLogTimeline.tsx)
+backlinks: []
+---*/
+
 'use client';
 
 import { useEffect, useState } from 'react';

@@ -1,3 +1,10 @@
+/*---
+id: noticeService.ts
+milestone: M0
+why: 기본 구조 파일 (noticeService.ts)
+backlinks: []
+---*/
+
 /**
  * @file src/services/noticeService.ts
  * @description 공지사항 게시판 데이터베이스 통신 및 비즈니스 로직

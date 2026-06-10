@@ -1,3 +1,10 @@
+/*---
+id: dashboardService.ts
+milestone: M0
+why: 기본 구조 파일 (dashboardService.ts)
+backlinks: []
+---*/
+
 /**
  * @file src/services/dashboardService.ts
  * @description 대시보드 통계 데이터 조회 비즈니스 로직

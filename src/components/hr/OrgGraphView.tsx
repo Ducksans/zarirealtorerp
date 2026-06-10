@@ -1,3 +1,10 @@
+/*---
+id: OrgGraphView.tsx
+milestone: M0
+why: 기본 구조 파일 (OrgGraphView.tsx)
+backlinks: []
+---*/
+
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';

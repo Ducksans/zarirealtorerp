@@ -1,3 +1,10 @@
+/*---
+id: userService.ts
+milestone: M0
+why: 기본 구조 파일 (userService.ts)
+backlinks: []
+---*/
+
 /**
  * @file src/services/userService.ts
  * @description 사용자(직원) 관리 서비스 - 확장된 개인정보, 이력 추적, Soft Delete 포함

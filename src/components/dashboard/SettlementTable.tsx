@@ -1,3 +1,10 @@
+/*---
+id: SettlementTable.tsx
+milestone: M0
+why: 기본 구조 파일 (SettlementTable.tsx)
+backlinks: []
+---*/
+
 /**
  * @file src/components/dashboard/SettlementTable.tsx
  * @description 직원별 정산 내역 및 검색 필터 테이블 컴포넌트

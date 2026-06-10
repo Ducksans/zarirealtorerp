@@ -1,3 +1,10 @@
+/*---
+id: utils.ts
+milestone: M0
+why: 기본 구조 파일 (utils.ts)
+backlinks: []
+---*/
+
 /**
  * @file src/lib/utils.ts
  * @description 공통 유틸리티 함수 모음

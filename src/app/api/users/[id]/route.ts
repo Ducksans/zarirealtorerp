@@ -1,3 +1,10 @@
+/*---
+id: route.ts
+milestone: M0
+why: API 라우트 엔드포인트 (route.ts)
+backlinks: [[[API_Routes]]]
+---*/
+
 import { NextResponse } from 'next/server';
 import { getUserById, updateUser, deleteUser } from '@/services/userService';
 import { getCumulativeSales, getSalesAfterPromotion, getMonthlySalesTrend } from '@/services/analyticsService';

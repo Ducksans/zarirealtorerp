@@ -1,3 +1,16 @@
+/*---
+id: page.tsx
+milestone: M0
+why: 페이지 UI 진입점 (page.tsx)
+backlinks: [[[Pages]]]
+---*/
+
+/**
+ * @id MainB2CPortal
+ * @milestone M0
+ * @why 일반 고객이 처음 진입하는 B2C 포털 메인 화면
+ * @backlinks [[project_roadmap.md]]
+ */
 'use client';
 
 import { useEffect, useState } from 'react';

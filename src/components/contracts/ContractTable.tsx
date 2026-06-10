@@ -1,3 +1,10 @@
+/*---
+id: ContractTable.tsx
+milestone: M0
+why: 기본 구조 파일 (ContractTable.tsx)
+backlinks: []
+---*/
+
 /**
  * @file src/components/contracts/ContractTable.tsx
  * @description 계약(매출) 관리 - 매출 내역 리스트 컴포넌트

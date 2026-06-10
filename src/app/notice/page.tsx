@@ -1,3 +1,10 @@
+/*---
+id: page.tsx
+milestone: M0
+why: 페이지 UI 진입점 (page.tsx)
+backlinks: [[[Pages]]]
+---*/
+
 'use client';
 
 import { useState, useEffect } from 'react';

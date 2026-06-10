@@ -1,146 +1,39 @@
+/*---
+id: page.tsx
+milestone: M0
+why: 페이지 UI 진입점 (page.tsx)
+backlinks: [[[Pages]]]
+---*/
+
+import React from 'react';
+
 /**
- * @file src/app/hr/page.tsx
- * @description 인사 관리 메인 페이지 컴포넌트
- * @dependencies UserForm, UserTable
- * @purpose 서브 컴포넌트 조합 및 사용자 리스트 상태 중앙 관리 (1파일 1책임 분리)
+ * @id Mockup_hr
+ * @milestone M3
+ * @why 전역 프론트엔드 목업 선행 전개 (인사 관리)
  */
-
-'use client';
-
-import { useState, useEffect } from 'react';
-import UserForm from '@/components/hr/UserForm';
-import UserTable from '@/components/hr/UserTable';
-
-type User = {
-  id: string;
-  employeeId: string;
-  name: string;
-  role: string;
-  uplineId: string | null;
-  upline?: { name: string, employeeId: string } | null;
-};
-
-export default function HRManagement() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ACTIVE');
-
-  // Pagination states
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-
-  // Modal state
-  const [isFormVisible, setIsFormVisible] = useState(false);
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/users?search=${encodeURIComponent(searchTerm)}&role=${roleFilter}&status=${statusFilter}&page=${page}&limit=${limit}`);
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data.users || []);
-        setTotalCount(data.total || 0);
-        setTotalPages(data.totalPages || 1);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchUsers();
-    }, 400);
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, roleFilter, statusFilter, page, limit]);
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('정말 이 직원을 삭제하시겠습니까? 관련 데이터가 꼬일 수 있습니다.')) return;
-    try {
-      const res = await fetch(`/api/users?id=${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        alert('삭제 처리 중 오류가 발생했습니다.');
-        return;
-      }
-      fetchUsers();
-    } catch (e) {
-      alert('삭제에 실패했습니다.');
-    }
-  };
-
+export default function Page() {
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-8 font-sans">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">인사 관리 시스템</h1>
-          <p className="text-slate-400 mt-1">사번 관리, 사원 등록, 조직도(사수) 배정 및 검색</p>
-          <div className="flex gap-2 mt-4">
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
-            >
-              <option value="">모든 직급</option>
-              <option value="BRANCH_MGR">지점장</option>
-              <option value="DIV_HEAD">본부장</option>
-              <option value="TEAM_LEADER">팀장</option>
-              <option value="REGULAR">사원</option>
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
-            >
-              <option value="ACTIVE">재직자</option>
-              <option value="RESIGNED">퇴사자</option>
-            </select>
-            <button
-              onClick={() => setIsFormVisible(true)}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-medium transition-colors ml-auto flex items-center gap-2"
-            >
-              <span>➕ 신규 사원 등록</span>
-            </button>
-          </div>
+    <div className="p-10 min-h-[calc(100vh-64px)] bg-[#0d1117] text-[#c9d1d9] animate-fade-in">
+      <div className="max-w-6xl mx-auto border border-[#30363d] rounded-2xl bg-[#161b22] p-10 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-10 font-black text-8xl pointer-events-none">
+          MOCKUP
         </div>
-
-        <div className="w-full">
-          {/* Modal for UserForm */}
-          {isFormVisible && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 overflow-y-auto py-10">
-              <div className="relative w-full max-w-3xl my-auto">
-                <button
-                  onClick={() => setIsFormVisible(false)}
-                  className="absolute top-4 right-4 text-gray-400 hover:text-white z-10 p-2"
-                >
-                  ✕ 닫기
-                </button>
-                <UserForm onUserAdded={() => {
-                  fetchUsers();
-                  setIsFormVisible(false);
-                }} />
-              </div>
-            </div>
-          )}
-          
-          <UserTable 
-            users={users} 
-            loading={loading} 
-            searchTerm={searchTerm} 
-            onSearchChange={setSearchTerm} 
-            onDelete={handleDelete}
-            page={page}
-            limit={limit}
-            totalCount={totalCount}
-            totalPages={totalPages}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
-          />
+        <h1 className="text-4xl font-black text-white tracking-tight mb-4 flex items-center gap-3">
+          <span className="text-[#58a6ff]">/hr</span> 인사 관리
+        </h1>
+        <p className="text-gray-400 font-mono text-sm mb-10 border-l-4 border-[#FFD700] pl-4 py-1">
+          대표님의 지시(SEQ_001)에 따라 백엔드 구축 이전에 선행 전개된 프론트엔드 목업입니다.<br/>
+          현재 UI 청사진을 그리는 중이며, 확정 후 DB가 연결될 예정입니다.
+        </p>
+        
+        <div className="grid grid-cols-3 gap-6">
+          <div className="col-span-2 h-64 bg-[#0d1117] rounded-xl border border-dashed border-[#484f58] flex items-center justify-center text-gray-600 font-bold text-lg">
+            조직도 및 직원 리스트 (Draft)
+          </div>
+          <div className="col-span-1 h-64 bg-[#0d1117] rounded-xl border border-dashed border-[#484f58] flex items-center justify-center text-gray-600 font-bold text-lg">
+            인사 발령 위젯 (Draft)
+          </div>
         </div>
       </div>
     </div>

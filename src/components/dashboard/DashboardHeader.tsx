@@ -1,3 +1,10 @@
+/*---
+id: DashboardHeader.tsx
+milestone: M0
+why: 기본 구조 파일 (DashboardHeader.tsx)
+backlinks: []
+---*/
+
 /**
  * @file src/components/dashboard/DashboardHeader.tsx
  * @description 대시보드의 헤더 영역(타이틀 및 액션 버튼) 컴포넌트

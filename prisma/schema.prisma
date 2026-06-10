@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -97,6 +97,11 @@ model Contract {
   id               String   @id @default(cuid())
   agentId          String
   agent            User     @relation(fields: [agentId], references: [id])
+  
+  propertyAddress  String?  // 거래 목적물 주소
+  clientName       String?  // 고객명
+  contractType     String?  // "매매", "전세", "월세" 등
+  
   grossCommission  Int      // 부가세 별도 총액
   contractDate     DateTime @default(now())
   
@@ -105,6 +110,18 @@ model Contract {
   signatureDate    DateTime?
   paymentStatus    String   @default("PENDING") // PENDING, PAID, NON_PAID
   paymentDate      DateTime?
+  
+  documents        ContractDocument[]
+}
+
+model ContractDocument {
+  id         String   @id @default(uuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  type       String   // "계약서", "중개대상물확인설명서", "등기부등본", "건축물대장", "영수증", "비밀유지서약서", "기타"
+  fileName   String   // 원본 파일명
+  fileUrl    String   // 스토리지 경로
+  uploadedAt DateTime @default(now())
 }
 
 model Settlement {

@@ -1,3 +1,10 @@
+/*---
+id: analyticsService.ts
+milestone: M0
+why: 기본 구조 파일 (analyticsService.ts)
+backlinks: []
+---*/
+
 /**
  * @file src/services/analyticsService.ts
  * @description 직원의 진급 및 실적 데이터를 분석하는 서비스

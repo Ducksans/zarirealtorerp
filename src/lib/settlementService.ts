@@ -1,3 +1,10 @@
+/*---
+id: settlementService.ts
+milestone: M0
+why: 기본 구조 파일 (settlementService.ts)
+backlinks: []
+---*/
+
 /**
  * @file src/lib/settlementService.ts
  * @description 월간 정산 급여액 계산 및 DB 저장 비즈니스 로직

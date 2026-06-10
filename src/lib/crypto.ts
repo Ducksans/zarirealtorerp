@@ -1,3 +1,10 @@
+/*---
+id: crypto.ts
+milestone: M0
+why: 기본 구조 파일 (crypto.ts)
+backlinks: []
+---*/
+
 import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-cbc';

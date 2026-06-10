@@ -1,3 +1,10 @@
+/*---
+id: contractService.ts
+milestone: M0
+why: 기본 구조 파일 (contractService.ts)
+backlinks: []
+---*/
+
 /**
  * @file src/services/contractService.ts
  * @description 계약(매출) 관련 데이터베이스 통신 및 비즈니스 로직

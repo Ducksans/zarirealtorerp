@@ -1,3 +1,10 @@
+/*---
+id: index.ts
+milestone: M0
+why: 기본 구조 파일 (index.ts)
+backlinks: []
+---*/
+
 /**
  * @file src/types/index.ts
  * @description 시스템 전역 공유 타입 및 상수 정의

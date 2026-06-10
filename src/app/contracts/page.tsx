@@ -1,3 +1,10 @@
+/*---
+id: page.tsx
+milestone: M0
+why: 페이지 UI 진입점 (page.tsx)
+backlinks: [[[Pages]]]
+---*/
+
 /**
  * @file src/app/contracts/page.tsx
  * @description 계약 관리 메인 페이지 컴포넌트

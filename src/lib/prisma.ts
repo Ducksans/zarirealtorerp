@@ -1,3 +1,10 @@
+/*---
+id: prisma.ts
+milestone: M0
+why: 기본 구조 파일 (prisma.ts)
+backlinks: []
+---*/
+
 /**
  * @file src/lib/prisma.ts
  * @description PrismaClient 싱글턴 인스턴스 관리

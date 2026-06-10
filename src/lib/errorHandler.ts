@@ -1,3 +1,10 @@
+/*---
+id: errorHandler.ts
+milestone: M0
+why: 기본 구조 파일 (errorHandler.ts)
+backlinks: []
+---*/
+
 /**
  * @file src/lib/errorHandler.ts
  * @description 전역 에러 핸들링 미들웨어 유틸리티

@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ data: newRequest }, { status: 201 });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
+      return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
     }
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }

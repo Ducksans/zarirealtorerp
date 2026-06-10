@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const validated = CreateNoticeSchema.parse(body);
     
-    const notice = await createNotice(validated.title, validated.content, validated.authorId);
+    const notice = await createNotice(validated.title, validated.content, validated.authorId || 'SYSTEM');
     return NextResponse.json(notice, { status: 201 });
   } catch (error) {
     return handleError(error);

@@ -117,7 +117,7 @@ export default function ApprovalDashboard() {
               {requests.length === 0 && (
                 <div className="text-slate-500 text-sm p-4">대기 중인 결재가 없습니다.</div>
               )}
-              {requests.map(req => (
+              {requests.map((req: any) => (
                 <div 
                   key={req.id} 
                   onClick={() => setActiveReqId(req.id)}

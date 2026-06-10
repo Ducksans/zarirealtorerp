@@ -117,13 +117,13 @@ export default function MainDashboard() {
                     fontSize={12} 
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => `${(value / 10000).toLocaleString()}만`}
+                    tickFormatter={(value: any) => `${(Number(value) / 10000).toLocaleString()}만`}
                     dx={-10}
                   />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                     itemStyle={{ color: '#818cf8', fontWeight: 'bold' }}
-                    formatter={(value: number) => [`${value.toLocaleString()} 원`, '매출액']}
+                    formatter={(value: any) => [`${Number(value || 0).toLocaleString()} 원`, '매출액']}
                   />
                   <Area 
                     type="monotone" 

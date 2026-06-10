@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { Bell, Search, Filter, TrendingUp, Users, DollarSign, Activity } from "lucide-react";
 import VerifiedListing from "@/components/VerifiedListing";
 import useSWR from "swr";
@@ -14,7 +14,7 @@ export default function Dashboard() {
   const { data: stats, error: statsError } = useSWR('/api/dashboard/stats', fetcher, { suspense: true, fallbackData: {} });
   const { data: activity, error: activityError } = useSWR('/api/dashboard/activity', fetcher, { suspense: true, fallbackData: [] });
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -22,7 +22,7 @@ export default function Dashboard() {
     }
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };

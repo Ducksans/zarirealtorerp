@@ -36,7 +36,7 @@ export default function SalesTrendChart({ data }: { data: any[] }) {
           <Tooltip 
             contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151' }}
             itemStyle={{ color: '#e5e7eb' }}
-            formatter={(value: number) => [`${value.toLocaleString()} 만원`, '매출']}
+            formatter={(value: any) => [`${Number(value || 0).toLocaleString()} 만원`, '매출']}
           />
           <Bar dataKey="sales" fill="#6366f1" radius={[4, 4, 0, 0]} />
         </BarChart>

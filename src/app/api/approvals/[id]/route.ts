@@ -8,16 +8,17 @@ const approvalSchema = z.object({
   memo: z.string().optional()
 });
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const body = await req.json();
     const validatedData = approvalSchema.parse(body);
 
     if (validatedData.action === 'APPROVE') {
-      const updated = await approveRequest(params.id, validatedData.role || '', validatedData.memo || '');
+      const updated = await approveRequest(id, validatedData.role || '', validatedData.memo || '');
       return NextResponse.json({ data: updated });
     } else if (validatedData.action === 'REJECT') {
-      const updated = await rejectRequest(params.id);
+      const updated = await rejectRequest(id);
       return NextResponse.json({ data: updated });
     }
     
@@ -25,7 +26,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
+      return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

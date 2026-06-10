@@ -4,9 +4,10 @@ import { getCumulativeSales, getSalesAfterPromotion, getMonthlySalesTrend } from
 import { handleError } from '@/lib/errorHandler';
 import { ROLES } from '@/types';
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await getUserById(params.id);
+    const { id } = await params;
+    const user = await getUserById(id);
     
     // 분석 데이터 추가 연산
     const totalSales = await getCumulativeSales(user.id);
@@ -30,22 +31,24 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const body = await req.json();
     const reason = body.reason || '관리자 정보 수정';
-    const updated = await updateUser(params.id, body.data, 'SYSTEM', reason);
+    const updated = await updateUser(id, body.data, 'SYSTEM', reason);
     return NextResponse.json(updated);
   } catch (error) {
     return handleError(error);
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const body = await req.json();
     const reason = body.reason || '직원 퇴사 처리';
-    await deleteUser(params.id, 'SYSTEM', reason);
+    await deleteUser(id, 'SYSTEM', reason);
     return NextResponse.json({ success: true });
   } catch (error) {
     return handleError(error);

@@ -1,184 +1,370 @@
 /*---
-id: page.tsx
-milestone: M0
-why: 페이지 UI 진입점 (page.tsx)
-backlinks: [[[Pages]]]
+id: hr/approvals/page.tsx
+milestone: M3
+why: 채용 ATS — 순차 결재함 (TL→DH→BM→CEO 승인/반려, APPROVED 시 사원 전환)
+backlinks: [[[Pages]], [[api/onboarding/route.ts]], [[api/onboarding/[id]/route.ts]]]
 ---*/
 
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-// 모의 데이터
-const PENDING_REQUESTS = [
-  {
-    id: 'req-001',
-    name: '김신입',
-    status: 'PENDING_TL', // 현재 결재 단계: 팀장
-    phone: '010-1234-5678',
-    submittedAt: '2026-06-09T09:00:00Z',
-    aiAnalysis: {
-      type: 'ISTJ (논리적이고 체계적인 실무자형)',
-      strengths: ['꼼꼼한 계약서 검토 능력', '강한 책임감과 성실성', '숫자 및 데이터 기반의 객관적 판단력'],
-      weaknesses: ['유연한 커뮤니케이션 스킬 부족', '돌발 상황에 대한 임기응변 약함'],
-      strategy: '초기 3개월은 반복적인 서류 작업과 데이터 입력 업무 위주로 배정하여 성취감을 부여하십시오. 이후 점진적으로 고객 응대 역할을 늘려가는 방식을 추천합니다. 즉흥적인 지시보다는 문서화된 가이드라인 제공이 효과적입니다.',
-    }
-  }
+type OnboardingRow = {
+  id: string;
+  name: string;
+  birthDate: string;
+  phone: string;
+  address: string;
+  bankAccount: string;
+  documents: string;
+  atsStage: string;
+  status: string;
+  tlMemo: string | null;
+  dhMemo: string | null;
+  bmMemo: string | null;
+  ceoMemo: string | null;
+  createdAt: string;
+};
+
+type ApproverRole = 'TL' | 'DH' | 'BM' | 'CEO';
+
+const ROLE_OPTIONS: { value: ApproverRole; label: string; pending: string }[] = [
+  { value: 'TL', label: '팀장 (1차)', pending: 'PENDING_TL' },
+  { value: 'DH', label: '본부장 (2차)', pending: 'PENDING_DH' },
+  { value: 'BM', label: '지점장 (3차)', pending: 'PENDING_BM' },
+  { value: 'CEO', label: '대표 (최종)', pending: 'PENDING_CEO' },
 ];
 
-export default function ApprovalDashboard() {
-  const [activeReq, setActiveReq] = useState(PENDING_REQUESTS[0]);
+// 현재 결재자 이전 단계의 메모들
+const PRIOR_MEMOS: Record<ApproverRole, { field: keyof OnboardingRow; label: string }[]> = {
+  TL: [],
+  DH: [{ field: 'tlMemo', label: '팀장 메모' }],
+  BM: [
+    { field: 'tlMemo', label: '팀장 메모' },
+    { field: 'dhMemo', label: '본부장 메모' },
+  ],
+  CEO: [
+    { field: 'tlMemo', label: '팀장 메모' },
+    { field: 'dhMemo', label: '본부장 메모' },
+    { field: 'bmMemo', label: '지점장 메모' },
+  ],
+};
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+function parseDocuments(json: string): { type: string; url: string }[] {
+  try {
+    const parsed = JSON.parse(json || '[]');
+    return Array.isArray(parsed) ? parsed.filter((d) => d && d.type && d.url) : [];
+  } catch {
+    return [];
+  }
+}
+
+export default function ApprovalsInboxPage() {
+  const [role, setRole] = useState<ApproverRole>('TL');
+  const [rows, setRows] = useState<OnboardingRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedId, setSelectedId] = useState('');
   const [memo, setMemo] = useState('');
+  const [acting, setActing] = useState(false);
+  const [convertedInfo, setConvertedInfo] = useState<Record<string, string>>({});
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/onboarding');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '목록 조회 실패');
+      setRows(data.requests);
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '목록 조회 실패');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const roleOption = ROLE_OPTIONS.find((r) => r.value === role)!;
+  const pendingRows = rows.filter((r) => r.status === roleOption.pending);
+  const approvedRows = rows.filter((r) => r.status === 'APPROVED' && r.atsStage !== 'ONBOARDING');
+  const selected = pendingRows.find((r) => r.id === selectedId) || pendingRows[0] || null;
+
+  const decide = async (decision: 'APPROVE' | 'REJECT') => {
+    if (!selected) return;
+    if (decision === 'REJECT' && !memo.trim()) {
+      alert('반려 시 사유(메모) 입력은 필수입니다.');
+      return;
+    }
+    setActing(true);
+    try {
+      const res = await fetch(`/api/onboarding/${selected.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approve: { as: role, memo: memo.trim(), decision } }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || '결재 처리 실패');
+        return;
+      }
+      setMemo('');
+      setSelectedId('');
+      await load();
+    } catch {
+      alert('네트워크 오류로 결재 처리에 실패했습니다.');
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const convert = async (row: OnboardingRow) => {
+    setActing(true);
+    try {
+      const res = await fetch(`/api/onboarding/${row.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'convert', actorId: role }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || '사원 전환 실패');
+        return;
+      }
+      setConvertedInfo((prev) => ({ ...prev, [row.id]: data.employeeId }));
+      await load();
+    } catch {
+      alert('네트워크 오류로 사원 전환에 실패했습니다.');
+    } finally {
+      setActing(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-10 font-sans">
-      <div className="max-w-[1600px] mx-auto space-y-8">
-        
+    <div className="min-h-screen bg-[#0a0c10] text-[#cdd2da] p-6 lg:p-10 font-sans [word-break:keep-all]">
+      <div className="max-w-[1400px] mx-auto space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2 flex items-center gap-3">
-            <span className="text-indigo-500">📝</span> 신규 입사 결재 및 멘토링 보드
-          </h1>
-          <p className="text-slate-400 font-medium text-sm">
-            신규 직원의 등록 요청을 순차 결재(팀장➔본부장➔지점장➔대표)하고, AI 분석을 바탕으로 멘토링 계획을 수립합니다.
-          </p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-extrabold text-white tracking-tight mb-2">입사 결재함</h1>
+            <p className="text-sm text-[#8b93a3]">
+              팀장 → 본부장 → 지점장 → 대표 순서로 결재합니다. 최종 승인된 지원자는 사원으로 전환할 수 있습니다.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-[#6b7280]">데모 모드 — 결재자 역할</label>
+            <select
+              value={role}
+              onChange={(e) => {
+                setRole(e.target.value as ApproverRole);
+                setSelectedId('');
+                setMemo('');
+              }}
+              className="bg-[#11141a] border border-[#1f2430] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/60"
+            >
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* Left: Pending List */}
-          <div className="lg:col-span-3 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden flex flex-col h-[750px]">
-            <div className="p-5 border-b border-slate-800">
-              <h2 className="font-bold text-white text-lg">결재 대기 목록</h2>
+        <div className="bg-[#11141a] border border-[#1f2430] rounded-xl px-5 py-3 text-sm inline-block">
+          내 결재 대기 <span className="font-extrabold text-amber-400">{pendingRows.length}건</span>
+        </div>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl px-4 py-3">{error}</div>
+        )}
+
+        {loading ? (
+          <div className="text-sm text-[#6b7280] py-16 text-center">결재 목록을 불러오는 중...</div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* 대기 목록 */}
+            <div className="lg:col-span-4 bg-[#11141a] border border-[#1f2430] rounded-2xl overflow-hidden flex flex-col max-h-[640px]">
+              <div className="px-5 py-4 border-b border-[#1f2430] font-bold text-white text-sm">
+                {roleOption.label} 결재 대기 목록
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {pendingRows.length === 0 && (
+                  <div className="text-xs text-[#4a5161] text-center py-10">현재 단계의 결재 대기 건이 없습니다.</div>
+                )}
+                {pendingRows.map((row) => (
+                  <button
+                    key={row.id}
+                    onClick={() => {
+                      setSelectedId(row.id);
+                      setMemo('');
+                    }}
+                    className={`w-full text-left p-4 rounded-xl border transition-colors ${
+                      selected?.id === row.id
+                        ? 'bg-indigo-500/10 border-indigo-500/50'
+                        : 'bg-[#0a0c10] border-[#1f2430] hover:border-indigo-500/30'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-bold text-white text-sm">{row.name}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full border bg-amber-500/15 text-amber-400 border-amber-500/30 font-semibold">
+                        결재 대기
+                      </span>
+                    </div>
+                    <div className="text-xs text-[#6b7280]">
+                      {row.phone} · 접수일 {formatDate(row.createdAt)}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {PENDING_REQUESTS.map(req => (
-                <div key={req.id} className="p-4 rounded-xl border bg-indigo-600/10 border-indigo-500 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.1)]">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-bold text-white">{req.name}</span>
-                    <span className="text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded">팀장 대기</span>
+
+            {/* 상세 + 결재 */}
+            <div className="lg:col-span-8 bg-[#11141a] border border-[#1f2430] rounded-2xl flex flex-col max-h-[640px] overflow-hidden">
+              {!selected ? (
+                <div className="flex-1 flex items-center justify-center text-sm text-[#4a5161]">
+                  좌측 목록에서 결재할 지원자를 선택하세요.
+                </div>
+              ) : (
+                <>
+                  <div className="px-6 py-4 border-b border-[#1f2430] flex justify-between items-center">
+                    <h2 className="font-bold text-white">{selected.name} 지원자</h2>
+                    <span className="text-xs text-[#6b7280]">ATS 단계: {selected.atsStage}</span>
                   </div>
-                  <div className="text-xs text-slate-400">{req.phone}</div>
-                  <div className="text-xs text-slate-500 mt-2">제출: {new Date(req.submittedAt).toLocaleString()}</div>
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {/* 지원자 정보 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm bg-[#0a0c10] border border-[#1f2430] rounded-xl p-5">
+                      <div><span className="text-[#6b7280] block text-xs mb-0.5">생년월일</span>{selected.birthDate}</div>
+                      <div><span className="text-[#6b7280] block text-xs mb-0.5">연락처</span>{selected.phone}</div>
+                      <div className="sm:col-span-2"><span className="text-[#6b7280] block text-xs mb-0.5">주소</span>{selected.address}</div>
+                      <div className="sm:col-span-2"><span className="text-[#6b7280] block text-xs mb-0.5">급여 계좌</span>{selected.bankAccount}</div>
+                      <div className="sm:col-span-2">
+                        <span className="text-[#6b7280] block text-xs mb-1">첨부 서류</span>
+                        {parseDocuments(selected.documents).length === 0 ? (
+                          <span className="text-[#4a5161] text-xs">첨부 없음</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {parseDocuments(selected.documents).map((d, i) => (
+                              <a
+                                key={i}
+                                href={d.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs px-2.5 py-1 rounded-lg border border-[#1f2430] bg-[#11141a] text-indigo-400 hover:text-indigo-300 transition-colors"
+                              >
+                                {d.type} ↗
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 이전 결재 메모 */}
+                    {PRIOR_MEMOS[role].length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-bold text-white">이전 결재 메모</h3>
+                        {PRIOR_MEMOS[role].map(({ field, label }) => (
+                          <div key={field} className="bg-[#0a0c10] border border-[#1f2430] rounded-xl p-4">
+                            <div className="text-xs text-emerald-400 font-bold mb-1">{label} — 승인</div>
+                            <p className="text-sm text-[#8b93a3]">
+                              {(selected[field] as string | null) || '메모 없음'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 결재 입력 */}
+                    <div className="bg-[#0a0c10] border border-[#1f2430] rounded-xl p-5 space-y-3">
+                      <label className="block text-sm font-bold text-white">
+                        {roleOption.label} 결재 메모 <span className="text-xs font-normal text-[#6b7280]">(반려 시 필수)</span>
+                      </label>
+                      <textarea
+                        value={memo}
+                        onChange={(e) => setMemo(e.target.value)}
+                        placeholder="멘토링 계획, 평가 의견, 반려 사유 등을 기록하세요."
+                        className="w-full h-24 bg-[#11141a] border border-[#1f2430] rounded-lg p-3 text-sm text-[#cdd2da] placeholder:text-[#4a5161] focus:outline-none focus:ring-1 focus:ring-indigo-500/60 resize-none"
+                      />
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => decide('APPROVE')}
+                          disabled={acting}
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-wait text-white font-bold py-2.5 rounded-lg transition-colors"
+                        >
+                          승인
+                        </button>
+                        <button
+                          onClick={() => decide('REJECT')}
+                          disabled={acting}
+                          className="flex-1 bg-[#11141a] border border-red-500/40 text-red-400 hover:bg-red-500/10 disabled:opacity-40 disabled:cursor-wait font-bold py-2.5 rounded-lg transition-colors"
+                        >
+                          반려
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 최종 승인 완료 — 사원 전환 */}
+        {!loading && (
+          <div className="bg-[#11141a] border border-[#1f2430] rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-white text-sm">최종 승인 완료 — 사원 전환 대기</h2>
+              <span className="text-xs text-[#6b7280]">{approvedRows.length}건</span>
+            </div>
+            {approvedRows.length === 0 && Object.keys(convertedInfo).length === 0 && (
+              <p className="text-xs text-[#4a5161]">전환 대기 중인 지원자가 없습니다.</p>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {approvedRows.map((row) => (
+                <div key={row.id} className="bg-[#0a0c10] border border-emerald-500/30 rounded-xl p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-bold text-white text-sm">{row.name}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-semibold">
+                      APPROVED
+                    </span>
+                  </div>
+                  <div className="text-xs text-[#6b7280] mb-3">
+                    {row.phone} · 접수일 {formatDate(row.createdAt)}
+                  </div>
+                  <button
+                    onClick={() => convert(row)}
+                    disabled={acting}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-wait text-white font-bold py-2.5 rounded-lg text-sm transition-colors"
+                  >
+                    사원 전환 (사번 발급)
+                  </button>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Middle: AI Analysis & Profile */}
-          <div className="lg:col-span-5 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl flex flex-col h-[750px] overflow-hidden">
-             <div className="p-6 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
-              <h2 className="font-bold text-white text-lg">{activeReq.name} 지원자 상세 프로필</h2>
-              <button className="text-xs bg-slate-800 text-slate-300 px-3 py-1.5 rounded border border-slate-700 hover:text-white">이력서 원본 보기 ↗</button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              
-              {/* AI Analysis Panel */}
-              <div className="bg-gradient-to-br from-indigo-900/40 to-slate-900 border border-indigo-500/30 rounded-xl p-6 shadow-inner relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 blur-3xl -mr-10 -mt-10 rounded-full"></div>
-                <h3 className="text-indigo-400 font-bold mb-4 flex items-center gap-2">
-                  <span className="text-xl">✨</span> AI 이력서/자소서 분석 리포트
-                </h3>
-                
-                <div className="space-y-4 text-sm">
-                  <div>
-                    <span className="block text-slate-400 mb-1 text-xs font-semibold uppercase">분류 유형</span>
-                    <div className="font-bold text-white bg-slate-950 px-3 py-2 rounded-lg border border-slate-800 inline-block">{activeReq.aiAnalysis.type}</div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-950/50 p-4 rounded-xl border border-emerald-500/20">
-                       <span className="block text-emerald-400 mb-2 font-bold flex items-center gap-1">↑ 강점 (Strengths)</span>
-                       <ul className="list-disc list-inside text-slate-300 space-y-1 text-xs">
-                         {activeReq.aiAnalysis.strengths.map((s, i) => <li key={i}>{s}</li>)}
-                       </ul>
+              {/* 방금 전환 완료된 건 — 발급 사번 표시 */}
+              {Object.entries(convertedInfo).map(([reqId, employeeId]) => {
+                const row = rows.find((r) => r.id === reqId);
+                return (
+                  <div key={reqId} className="bg-[#0a0c10] border border-emerald-500/40 rounded-xl p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-bold text-white text-sm">{row?.name || '신규 사원'}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-semibold">
+                        전환 완료
+                      </span>
                     </div>
-                    <div className="bg-slate-950/50 p-4 rounded-xl border border-red-500/20">
-                       <span className="block text-red-400 mb-2 font-bold flex items-center gap-1">↓ 약점 (Weaknesses)</span>
-                       <ul className="list-disc list-inside text-slate-300 space-y-1 text-xs">
-                         {activeReq.aiAnalysis.weaknesses.map((s, i) => <li key={i}>{s}</li>)}
-                       </ul>
+                    <div className="text-xs text-[#8b93a3]">
+                      발급 사번 <span className="font-mono font-bold text-emerald-400">{employeeId}</span>
                     </div>
                   </div>
-
-                  <div className="bg-indigo-950/30 p-4 rounded-xl border border-indigo-500/30 mt-4">
-                     <span className="block text-indigo-300 mb-2 font-bold text-xs">💡 추천 멘토링 전략</span>
-                     <p className="text-slate-300 leading-relaxed">{activeReq.aiAnalysis.strategy}</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Basic Info Summary */}
-              <div>
-                <h3 className="font-bold text-white border-b border-slate-800 pb-2 mb-4">입력된 기본 정보 요약</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm bg-slate-950 p-4 rounded-xl border border-slate-800">
-                  <div className="text-slate-500">연락처</div><div className="text-white">{activeReq.phone}</div>
-                  <div className="text-slate-500">등본/통장/자격증</div><div className="text-emerald-400 font-bold">정상 업로드됨 (6건)</div>
-                </div>
-              </div>
-
+                );
+              })}
             </div>
           </div>
-
-          {/* Right: Approval Timeline & Mentoring Memo */}
-          <div className="lg:col-span-4 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl flex flex-col h-[750px]">
-            <div className="p-6 border-b border-slate-800 bg-slate-900">
-              <h2 className="font-bold text-white text-lg">다단계 결재 및 멘토링 기록</h2>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="relative border-l-2 border-slate-700 ml-3 space-y-8">
-                
-                {/* Step 1: Team Leader */}
-                <div className="relative pl-6">
-                  <span className="absolute -left-[11px] top-1 w-5 h-5 rounded-full border-4 border-slate-900 bg-amber-500 animate-pulse"></span>
-                  <div className="font-bold text-amber-400 mb-1">1차 결재: 팀장 (현재 단계)</div>
-                  <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl mt-2 shadow-inner">
-                    <label className="block text-xs text-slate-500 mb-2">팀장용 멘토링 메모 (본부장 이상 열람 가능)</label>
-                    <textarea 
-                      value={memo}
-                      onChange={e => setMemo(e.target.value)}
-                      placeholder="AI 분석을 참고하여 팀 내 배치 및 초기 교육 계획을 메모하십시오."
-                      className="w-full h-24 bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                    <button className="mt-3 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg shadow-lg transition-colors">
-                      메모 저장 및 승인 (본부장에게 이관)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Step 2: Division Head */}
-                <div className="relative pl-6 opacity-40">
-                  <span className="absolute -left-[11px] top-1 w-5 h-5 rounded-full border-4 border-slate-900 bg-slate-600"></span>
-                  <div className="font-bold text-slate-300 mb-1">2차 결재: 본부장</div>
-                  <div className="text-xs text-slate-500">대기 중</div>
-                </div>
-
-                {/* Step 3: Branch Manager */}
-                <div className="relative pl-6 opacity-40">
-                  <span className="absolute -left-[11px] top-1 w-5 h-5 rounded-full border-4 border-slate-900 bg-slate-600"></span>
-                  <div className="font-bold text-slate-300 mb-1">3차 결재: 지점장</div>
-                  <div className="text-xs text-slate-500">대기 중</div>
-                </div>
-
-                {/* Step 4: CEO/Admin */}
-                <div className="relative pl-6 opacity-40">
-                  <span className="absolute -left-[11px] top-1 w-5 h-5 rounded-full border-4 border-slate-900 bg-slate-600"></span>
-                  <div className="font-bold text-slate-300 mb-1">최종 승인: 대표/총무</div>
-                  <div className="text-xs text-slate-500">데이터 무결성 최종 확인 및 사번 발급 대기</div>
-                </div>
-
-              </div>
-            </div>
-            
-            <div className="p-6 border-t border-slate-800 bg-red-500/5">
-              <button className="w-full text-red-400 hover:text-red-300 text-sm font-bold transition-colors">
-                결재 반려 (입사 거절)
-              </button>
-            </div>
-          </div>
-
-        </div>
+        )}
       </div>
     </div>
   );

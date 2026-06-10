@@ -197,16 +197,43 @@ export default function TransparencyTracerPage() {
 
         {!loading && trace && (
           <div className="space-y-8">
-            {/* 원천: 총액 */}
-            <div className="trace-row bg-[#11141a] border border-[#1f2430] rounded-2xl p-8 text-center relative overflow-hidden">
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
-              <p className="text-[13px] text-zinc-500 mb-2">
-                {trace.yearMonth} · <span className="text-zinc-300 font-medium">{trace.user.name}</span>
-                <span className="ml-1 text-zinc-500">({ROLES_KO[trace.user.role as UserRole] ?? trace.user.role})</span>
-                {' '}· 계약 {trace.contracts.length}건의 중개보수 총액
-              </p>
-              <Krw amount={trace.gross} className="text-5xl font-bold text-white tracking-tight" />
-            </div>
+            {/* 히어로: 가장 크고 밝은 숫자의 주인은 "이 사람이 받는 돈"이다 (2026-06-11 대표 UX 원칙) */}
+            {(() => {
+              const agentTotal = trace.breakdown.shares
+                .filter(s => s.key === 'agent' || s.key === 'agentBonus')
+                .reduce((s, x) => s + x.amount, 0);
+              const agentPct = trace.gross > 0 ? Math.round((agentTotal / trace.gross) * 1000) / 10 : 0;
+              return (
+                <div className="trace-row bg-[#11141a] border border-emerald-900/40 rounded-2xl p-8 relative overflow-hidden">
+                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" />
+                  <p className="text-[13px] text-zinc-500 text-center mb-5">
+                    {trace.yearMonth} · <span className="text-zinc-300 font-medium">{trace.user.name}</span>
+                    <span className="ml-1 text-zinc-500">({ROLES_KO[trace.user.role as UserRole] ?? trace.user.role})</span>
+                    {' '}· 계약 {trace.contracts.length}건
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-center">
+                    <div className="text-center sm:text-right order-2 sm:order-1">
+                      <p className="text-[12px] text-zinc-500 mb-1">창출한 매출 총액</p>
+                      <Krw amount={trace.gross} className="text-xl font-semibold text-zinc-300" />
+                    </div>
+                    <div className="text-center order-1 sm:order-2">
+                      <p className="text-[13px] font-semibold text-emerald-300/90 mb-1">
+                        {trace.user.name}님이 받는 돈 <span className="text-zinc-500 font-normal">(영업분 실수령 예상)</span>
+                      </p>
+                      <Krw amount={agentTotal} className="text-5xl font-bold text-emerald-400 tracking-tight drop-shadow-[0_0_24px_rgba(52,211,153,0.15)]" />
+                      <p className="text-[13px] text-zinc-500 mt-2">= 매출 총액의 <span className="text-emerald-400 font-semibold">{agentPct}%</span></p>
+                    </div>
+                    <div className="text-center sm:text-left order-3">
+                      <p className="text-[12px] text-zinc-500 mb-1">회사·관리 조직으로</p>
+                      <Krw amount={trace.gross - agentTotal} className="text-xl font-semibold text-zinc-300" />
+                    </div>
+                  </div>
+                  <p className="text-center text-[12px] text-zinc-600 mt-5">
+                    관리자 오버라이딩은 전액 회사 귀속분 안에서 지급됩니다 — 본인 몫은 단 1원도 줄지 않습니다.
+                  </p>
+                </div>
+              );
+            })()}
 
             {/* 분해 흐름 */}
             <div className="space-y-3">

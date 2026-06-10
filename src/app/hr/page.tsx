@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import UserForm from '@/components/hr/UserForm';
 import UserTable from '@/components/hr/UserTable';
+import { toastError } from '@/lib/toast';
 
 type User = {
   id: string;
@@ -49,12 +50,12 @@ export default function HRManagement() {
     try {
       const res = await fetch(`/api/users?id=${id}`, { method: 'DELETE' });
       if (!res.ok) {
-        alert('삭제 처리 중 오류가 발생했습니다.');
+        toastError('삭제 처리 중 오류가 발생했습니다.');
         return;
       }
       mutate();
     } catch (e) {
-      alert('삭제에 실패했습니다.');
+      toastError('삭제에 실패했습니다.');
     }
   };
 

@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import ContractForm from '@/components/contracts/ContractForm';
 import ContractTable from '@/components/contracts/ContractTable';
+import { toastError } from '@/lib/toast';
 
 type User = {
   id: string;
@@ -60,12 +61,12 @@ export default function ContractManagement() {
     try {
       const res = await fetch(`/api/contracts?id=${id}`, { method: 'DELETE' });
       if (!res.ok) {
-        alert('삭제 처리 중 오류가 발생했습니다.');
+        toastError('삭제 처리 중 오류가 발생했습니다.');
         return;
       }
       mutate();
     } catch (e) {
-      alert('삭제에 실패했습니다.');
+      toastError('삭제에 실패했습니다.');
     }
   };
 

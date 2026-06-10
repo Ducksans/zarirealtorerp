@@ -7,6 +7,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toastError } from '@/lib/toast';
 
 type User = {
   id: string;
@@ -48,7 +49,7 @@ export default function ContractForm({ onContractAdded }: ContractFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.agentId || !formData.grossCommission) return alert('담당 사원과 계약금액을 입력해주세요.');
+    if (!formData.agentId || !formData.grossCommission) return toastError('담당 사원과 계약금액을 입력해주세요.');
     
     try {
       const res = await fetch('/api/contracts', {
@@ -57,7 +58,7 @@ export default function ContractForm({ onContractAdded }: ContractFormProps) {
         body: JSON.stringify(formData)
       });
       if (!res.ok) {
-        alert('매출 등록 중 서버 오류가 발생했습니다.');
+        toastError('매출 등록 중 서버 오류가 발생했습니다.');
         return;
       }
       
@@ -65,7 +66,7 @@ export default function ContractForm({ onContractAdded }: ContractFormProps) {
       setAgentSearch('');
       onContractAdded();
     } catch (e) {
-      alert('매출 등록에 실패했습니다.');
+      toastError('매출 등록에 실패했습니다.');
     }
   };
 

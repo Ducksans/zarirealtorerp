@@ -2,12 +2,108 @@
 
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
+import { toastError } from '@/lib/toast';
+import { motion, useAnimation, PanInfo } from 'framer-motion';
+import { Check, X } from 'lucide-react';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
+
+const SwipeableCard = ({ req, isActive, onClick, onApprove, onReject }: any) => {
+  const controls = useAnimation();
+
+  const handleDragEnd = async (event: any, info: PanInfo) => {
+    const threshold = 100;
+    if (info.offset.x > threshold) {
+      await controls.start({ x: 500, opacity: 0, transition: { duration: 0.2 } });
+      onApprove(req);
+    } else if (info.offset.x < -threshold) {
+      await controls.start({ x: -500, opacity: 0, transition: { duration: 0.2 } });
+      onReject(req);
+    } else {
+      controls.start({ x: 0, transition: { type: 'spring', stiffness: 300, damping: 20 } });
+    }
+  };
+
+  return (
+    <div className="relative w-full rounded-xl overflow-hidden mb-3">
+      {/* Background for swipe actions */}
+      <div className="absolute inset-0 flex justify-between items-center px-4 rounded-xl bg-slate-900 border border-slate-800">
+        <div className="flex items-center text-emerald-400 bg-emerald-500/10 p-2 rounded-lg">
+          <Check size={20} /> <span className="ml-2 font-bold text-xs uppercase tracking-wider">Approve</span>
+        </div>
+        <div className="flex items-center text-red-400 bg-red-500/10 p-2 rounded-lg">
+          <span className="mr-2 font-bold text-xs uppercase tracking-wider">Reject</span> <X size={20} />
+        </div>
+      </div>
+
+      {/* Draggable surface */}
+      <motion.div
+        drag="x"
+        dragConstraints={{ left: 0, right: 0 }}
+        dragDirectionLock
+        dragElastic={0.8}
+        onDragEnd={handleDragEnd}
+        animate={controls}
+        whileTap={{ cursor: 'grabbing' }}
+        onClick={onClick}
+        className={`relative z-10 w-full p-4 rounded-xl border cursor-grab transition-colors bg-slate-950 ${
+          isActive 
+            ? 'border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.2)]' 
+            : 'border-slate-800 hover:border-slate-700'
+        }`}
+      >
+        <div className="flex justify-between items-start mb-2">
+          <span className="font-bold text-white">{req.name}</span>
+          <span className="text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded">
+            {req.status.replace('PENDING_', '')} 대기
+          </span>
+        </div>
+        <div className="text-xs text-slate-400">{req.phone}</div>
+        <div className="text-xs text-slate-500 mt-2">제출: {new Date(req.createdAt).toLocaleString()}</div>
+      </motion.div>
+    </div>
+  );
+};
 
 export default function ApprovalDashboard() {
   const { data: responseData, error, isLoading, mutate } = useSWR('/api/approvals', fetcher);
   const requests = responseData?.data || [];
+  
+  const handleSwipeApprove = async (req: any) => {
+    let role = '';
+    if (req.status === 'PENDING_TL') role = 'TL';
+    else if (req.status === 'PENDING_DH') role = 'DH';
+    else if (req.status === 'PENDING_BM') role = 'BM';
+    else if (req.status === 'PENDING_CEO') role = 'CEO';
+
+    try {
+      const res = await fetch(`/api/approvals/${req.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'APPROVE', role, memo: 'Swipe to Approve' })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      mutate();
+    } catch (err: any) {
+      toastError(err.message);
+    }
+  };
+
+  const handleSwipeReject = async (req: any) => {
+    try {
+      const res = await fetch(`/api/approvals/${req.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'REJECT' })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      mutate();
+    } catch (err: any) {
+      toastError(err.message);
+    }
+  };
   
   const [activeReqId, setActiveReqId] = useState<string | null>(null);
   const [memo, setMemo] = useState('');
@@ -48,7 +144,7 @@ export default function ApprovalDashboard() {
       setMemo('');
       mutate();
     } catch (err: any) {
-      alert(err.message);
+      toastError(err.message);
     }
   };
 
@@ -66,7 +162,7 @@ export default function ApprovalDashboard() {
       setMemo('');
       mutate();
     } catch (err: any) {
-      alert(err.message);
+      toastError(err.message);
     }
   };
 
@@ -118,24 +214,14 @@ export default function ApprovalDashboard() {
                 <div className="text-slate-500 text-sm p-4">대기 중인 결재가 없습니다.</div>
               )}
               {requests.map((req: any) => (
-                <div 
+                <SwipeableCard 
                   key={req.id} 
+                  req={req}
+                  isActive={activeReqId === req.id}
                   onClick={() => setActiveReqId(req.id)}
-                  className={`p-4 rounded-xl border cursor-pointer transition-colors ${
-                    activeReqId === req.id 
-                      ? 'bg-indigo-600/10 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.1)]' 
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-bold text-white">{req.name}</span>
-                    <span className="text-xs px-2 py-1 bg-amber-500/20 text-amber-400 rounded">
-                      {req.status.replace('PENDING_', '')} 대기
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-400">{req.phone}</div>
-                  <div className="text-xs text-slate-500 mt-2">제출: {new Date(req.createdAt).toLocaleString()}</div>
-                </div>
+                  onApprove={handleSwipeApprove}
+                  onReject={handleSwipeReject}
+                />
               ))}
             </div>
           </div>

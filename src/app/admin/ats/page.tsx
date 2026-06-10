@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toastSuccess } from '@/lib/toast';
 
 // Mock Data for ATS (Applicant Tracking System)
 const INITIAL_CANDIDATES = [
@@ -25,7 +26,7 @@ export default function ATSKanbanBoard() {
   // 간단한 칸반 이동 시뮬레이션
   const moveCandidate = (id: string, currentStageIndex: number) => {
     if (currentStageIndex >= COLUMNS.length - 1) {
-      alert('최종 승인이 완료되어 정식 온보딩(마일스톤 5) 파이프라인으로 이관됩니다.');
+      toastSuccess('최종 승인이 완료되어 정식 온보딩(마일스톤 5) 파이프라인으로 이관됩니다.');
       return;
     }
     const nextStage = COLUMNS[currentStageIndex + 1].id;

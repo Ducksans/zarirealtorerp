@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toastError } from '@/lib/toast';
 
 export default function OnboardingWizard() {
   const [step, setStep] = useState(1);
@@ -34,10 +35,10 @@ export default function OnboardingWizard() {
         setIsSubmitted(true);
       } else {
         const errorData = await res.json();
-        alert(`오류: ${errorData.error}`);
+        toastError(`오류: ${errorData.error}`);
       }
     } catch (error) {
-      alert('네트워크 오류가 발생했습니다.');
+      toastError('네트워크 오류가 발생했습니다.');
     }
   };
 

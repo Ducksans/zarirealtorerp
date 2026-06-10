@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import DaumPostcode from 'react-daum-postcode';
+import { toastError, toastSuccess } from '@/lib/toast';
 
 type User = {
   id: string;
@@ -66,14 +67,14 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
     // 민감정보 제외하고 저장
     const { ssnSuffix, ...safeData } = formData;
     localStorage.setItem('hr_temp_form', JSON.stringify(safeData));
-    alert('임시저장 되었습니다. (주민등록번호 등 민감정보 및 첨부파일 제외)');
+    toastSuccess('임시저장 되었습니다. (주민등록번호 등 민감정보 및 첨부파일 제외)');
   };
 
   // -------------------------
   // 1. 사수 배정 (3단계 프로토콜)
   // -------------------------
   const handleUplineSearch = async () => {
-    if (!uplineSearch) return alert('검색어를 입력하세요.');
+    if (!uplineSearch) return toastError('검색어를 입력하세요.');
     try {
       const res = await fetch(`/api/users?search=${encodeURIComponent(uplineSearch)}`);
       const data = await res.json();
@@ -82,7 +83,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
         setIsUplineSearchOpen(true);
       }
     } catch (e) {
-      alert('검색 중 오류가 발생했습니다.');
+      toastError('검색 중 오류가 발생했습니다.');
     }
   };
 
@@ -198,7 +199,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
       
       if (!res.ok) {
         const err = await res.json();
-        alert(`오류: ${err.error || '사원 등록에 실패했습니다.'}`);
+        toastError(`오류: ${err.error || '사원 등록에 실패했습니다.'}`);
         setLoading(false);
         return;
       }
@@ -207,7 +208,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
       localStorage.removeItem('hr_temp_form');
       onUserAdded();
     } catch (e) {
-      alert('사원 등록에 실패했습니다.');
+      toastError('사원 등록에 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -215,8 +216,8 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name) return alert('이름을 입력해주세요.');
-    if (!formData.bankName && formData.bankAccount) return alert('은행을 선택해주세요.');
+    if (!formData.name) return toastError('이름을 입력해주세요.');
+    if (!formData.bankName && formData.bankAccount) return toastError('은행을 선택해주세요.');
     
     // 1. 동명이인 검증
     try {

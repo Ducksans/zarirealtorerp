@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
+import { toastError } from '@/lib/toast';
 
 type Notice = {
   id: string;
@@ -20,7 +21,7 @@ export default function NoticeBoard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title || !formData.content) return alert('제목과 내용을 모두 입력해주세요.');
+    if (!formData.title || !formData.content) return toastError('제목과 내용을 모두 입력해주세요.');
     
     await fetch('/api/notices', {
       method: 'POST',

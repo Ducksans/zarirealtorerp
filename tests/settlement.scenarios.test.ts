@@ -143,6 +143,27 @@ describe('100원 룰 — 단건 분배의 정의 (SSOT_Commission_100won_Rule.md
   });
 });
 
+describe('영업지원비 계단식 — 구간 돌파 동기부여 설계 (2026-06-11 대표 확언)', () => {
+  // "계단식으로 책정해야 구간을 넘어서려는 노력을 한다. 1,000만 초과는 흔치 않으니 격려 차원에서 15%"
+  it('회사귀속분 100만 미만 → 지원비 0원', async () => {
+    await seedOrg({ regulars: { count: 1, revenue: 180 * 만 }, teamLeaders: { count: 0, revenue: 0 } });
+    const r = await settle();
+    expect(r.byRole(ROLES.REGULAR)[0].bonusPay).toBe(0); // 귀속분 90만 → 구간 미달
+  });
+
+  it('귀속분 990만 → 90만 (100만 단위 절사 10%, 다음 구간을 향한 긴장)', async () => {
+    await seedOrg({ regulars: { count: 1, revenue: 1980 * 만 }, teamLeaders: { count: 0, revenue: 0 } });
+    const r = await settle();
+    expect(r.byRole(ROLES.REGULAR)[0].bonusPay).toBe(90 * 만);
+  });
+
+  it('귀속분 1,000만 돌파 → 150만 (15% 통 큰 격려 점프)', async () => {
+    await seedOrg({ regulars: { count: 1, revenue: 2000 * 만 }, teamLeaders: { count: 0, revenue: 0 } });
+    const r = await settle();
+    expect(r.byRole(ROLES.REGULAR)[0].bonusPay).toBe(150 * 만); // 999만의 90만에서 60만 점프
+  });
+});
+
 describe('수익 시뮬레이션 8대 시나리오 영구 박제 (revenue_simulation.md 완결판)', () => {
   it('S1 가분수 조직: 총매출 9,300만 / 본사 순이익 3,390만 (마진 36.5%)', async () => {
     await seedOrg({ regulars: { count: 13, revenue: 500 * 만 }, teamLeaders: { count: 7, revenue: 400 * 만 } });

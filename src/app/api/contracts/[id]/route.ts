@@ -16,13 +16,14 @@ const PatchContractSchema = z.object({
   reason: z.string().min(1, '변경 사유를 입력해주세요.')
 });
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const body = await req.json();
     const validated = PatchContractSchema.parse(body);
 
     const updated = await updateContractStatus(
-      params.id,
+      id,
       { signatureStatus: validated.signatureStatus, paymentStatus: validated.paymentStatus },
       'SYSTEM', // 향후 세션 연동
       validated.reason
@@ -33,11 +34,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const body = await req.json();
     const reason = body.reason || '관리자 강제 삭제';
-    await deleteContract(params.id, 'SYSTEM', reason);
+    await deleteContract(id, 'SYSTEM', reason);
     return NextResponse.json({ success: true });
   } catch (error) {
     return handleError(error);

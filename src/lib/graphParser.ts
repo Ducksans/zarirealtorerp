@@ -39,7 +39,7 @@ function parseMetadata(content: string, ext: string) {
   let title = '';
   let milestone = '';
   let type = '';
-  let backlinks: string[] = [];
+  const backlinks: string[] = [];
 
   if (ext === '.md') {
     // YAML Frontmatter 추출
@@ -107,8 +107,11 @@ export function generateGraphData(forceRefresh = false) {
     return { graphData: cachedGraphData, fileMap: fileMapCache };
   }
 
-  const artifactsPath = 'C:\\Users\\자리 공인중개사 사무소\\.gemini\\antigravity\\brain\\f109b2ff-b952-4b72-ad05-52ef5fdb2ad7\\artifacts';
-  const srcPath = 'C:\\Users\\자리 공인중개사 사무소\\.gemini\\antigravity\\scratch\\erp_system\\src';
+  // [Phase 0] 특정 PC 절대 경로 결박 해제 — 환경변수 우선, 기본값은 작업 공간 상대 경로
+  // DOCS_PATH: SSOT/기획 문서 폴더 (기본: 저장소 옆의 ../docs — erp_workspace/docs)
+  // CODE_SRC_PATH: 그래프에 포함할 소스 폴더 (기본: 현재 앱의 src)
+  const artifactsPath = process.env.DOCS_PATH ?? path.resolve(process.cwd(), '..', 'docs');
+  const srcPath = process.env.CODE_SRC_PATH ?? path.join(process.cwd(), 'src');
 
   const allFiles = [
     ...walkDir(artifactsPath),
@@ -140,7 +143,7 @@ export function generateGraphData(forceRefresh = false) {
       
       // 중복 ID 방지
       let attempt = 1;
-      let originalId = finalId;
+      const originalId = finalId;
       while(nodes.find(n => n.id === finalId)) {
         finalId = `${originalId}_${attempt}`;
         attempt++;
@@ -265,7 +268,7 @@ export function generateGraphData(forceRefresh = false) {
   const archiveNodes = nodes.filter(n => n.group === 'archive').sort((a, b) => b.timestamp - a.timestamp); // 나중 계산을 위해 역순 보존
 
   // [UX FIX] 최고 경영진 전용 브리핑 모드(CEO Mode) 데이터 파싱
-  let commandCenter: any = {
+  const commandCenter: any = {
     isCeoMode: true,
     diagnosis: { maturity: 0, errorRate: 0, insight: '' },
     milestones: [] as any[],
@@ -315,7 +318,9 @@ export function generateGraphData(forceRefresh = false) {
     }
 
     // [UX FIX] transcript.jsonl을 파싱하여 실시간 대화 맥락(Live Context) 추출
-    const transcriptPath = 'C:\\Users\\자리 공인중개사 사무소\\.gemini\\antigravity\\brain\\f109b2ff-b952-4b72-ad05-52ef5fdb2ad7\\.system_generated\\logs\\transcript.jsonl';
+    // [Phase 0] 경로 환경변수화 — 기본값은 작업 공간의 백업본
+    const transcriptPath = process.env.TRANSCRIPT_PATH
+      ?? path.resolve(process.cwd(), '..', 'backups', 'transcript_20260611.jsonl');
     if (fs.existsSync(transcriptPath)) {
       const transcriptContent = fs.readFileSync(transcriptPath, 'utf8');
       const lines = transcriptContent.split('\n').filter(l => l.trim() !== '');

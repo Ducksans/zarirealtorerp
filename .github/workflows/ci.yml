@@ -26,11 +26,19 @@ jobs:
     - name: Generate Prisma Client
       run: npx prisma generate
 
-    - name: Check Linting
-      run: npm run lint || true
+    # [Phase 0] 품질 게이트 재가동 — 어떤 단계도 실패를 무시하지 않는다
+    - name: Type Check
+      run: npx tsc --noEmit
+
+    - name: Lint
+      run: npm run lint
+
+    - name: Test (100원 룰 + 정산 시나리오 박제)
+      run: npm test
+      env:
+        DATABASE_URL: "file:./test.db"
 
     - name: Build Next.js Application
       run: npm run build
       env:
-        # 빌드 테스트를 위한 더미 환경 변수
         DATABASE_URL: "file:./dev.db"

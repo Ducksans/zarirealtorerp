@@ -181,7 +181,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               const isSelected = selectedNode?.id === node.id;
               
               // 궁극의 시맨틱 타임스탬프 네이밍 생성!
-              let displayName = getSemanticTitle(node, msKeyword, typeKeyword);
+              const displayName = getSemanticTitle(node, msKeyword, typeKeyword);
 
               let icon = '📄';
               if (node.ext === '.ts' || node.ext === '.tsx') icon = '🧩';

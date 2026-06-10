@@ -136,7 +136,7 @@ export default function MainDashboard() {
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                     itemStyle={{ color: '#818cf8', fontWeight: 'bold' }}
-                    formatter={(value: number) => [`${value.toLocaleString()} 원`, '매출액']}
+                    formatter={(value) => [`${Number(value).toLocaleString()} 원`, '매출액']}
                   />
                   <Area 
                     type="monotone" 

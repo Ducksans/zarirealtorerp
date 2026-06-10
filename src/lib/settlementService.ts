@@ -18,13 +18,8 @@ import { Contract } from '@prisma/client';
 import { ROLES } from '@/types';
 import { AppError } from '@/lib/errorHandler';
 import { createAuditLog } from '@/services/auditService';
-
-// 영업지원비 (보너스) 계단식 산정 함수
-function getBonus(companyRev: number): number {
-  if (companyRev < 1000000) return 0;
-  if (companyRev < 10000000) return Math.floor(companyRev / 1000000) * 1000000 * 0.1;
-  return companyRev * 0.15;
-}
+// 영업지원비 계단식 산정 — 분해 추적기와 단일 규칙 공유 (commissionBreakdown.ts)
+import { getBonus } from '@/lib/commissionBreakdown';
 
 export async function processMonthlySettlement(yearMonth: string) {
   // 월 정산 범위: 해당 월(yearMonth)에 체결된 계약만 포함

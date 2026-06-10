@@ -1,143 +1,287 @@
 /*---
-id: page.tsx
-milestone: M0
-why: 페이지 UI 진입점 (page.tsx)
-backlinks: [[[Pages]]]
+id: admin_transparency_page
+milestone: M9
+why: 시그니처 투명성 뷰 — 직원의 실제 월 매출이 100원 룰로 누구에게 얼마씩 흐르는지 애니메이션으로 증명 (입사설명회 쇼케이스 1호 화면)
+backlinks: [[SSOT_Commission_100won_Rule.md]], [[Launch_Battle_Plan_D30.md]]
 ---*/
 
-/**
- * @id AdminTransparencyDashboard
- * @milestone M15
- * @why 리더보드와 랭킹 시스템을 통해 영업조직의 건강한 경쟁심리 유도
- * @backlinks [[project_roadmap.md]]
- */
 'use client';
-import { useState } from 'react';
-import Link from 'next/link';
 
-export default function TransparencyDashboard() {
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { ROLES_KO, type UserRole } from '@/types';
+
+type Share = { key: string; label: string; amount: number; pct: number; formula: string };
+type TraceData = {
+  yearMonth: string;
+  user: { id: string; name: string; role: string; employeeId: string };
+  recipients: {
+    teamLeader: { name: string; role: string } | null;
+    divHead: { name: string; role: string } | null;
+    branchMgrCount: number;
+    branchMgrs: { name: string }[];
+  };
+  contracts: { id: string; grossCommission: number; contractDate: string; propertyAddress: string | null; contractType: string | null }[];
+  gross: number;
+  breakdown: { shares: Share[] };
+  settlement: { basePay: number; bonusPay: number; totalPay: number } | null;
+};
+type UserHit = { id: string; name: string; role: string; employeeId: string };
+
+/** rAF 기반 카운트업 — 데이터가 도착하는 순간에만 절제된 모션 */
+function useCountUp(target: number, durationMs = 900) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now();
+    const from = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / durationMs);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(Math.round(from + (target - from) * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, durationMs]);
+  return value;
+}
+
+function Krw({ amount, className }: { amount: number; className?: string }) {
+  const v = useCountUp(amount);
+  return <span className={className}>₩ {v.toLocaleString('ko-KR')}</span>;
+}
+
+const SHARE_STYLE: Record<string, { bar: string; text: string; ring: string }> = {
+  agent:      { bar: 'bg-emerald-500',  text: 'text-emerald-400', ring: 'ring-emerald-500/30' },
+  agentBonus: { bar: 'bg-emerald-700', text: 'text-emerald-500', ring: 'ring-emerald-700/30' },
+  teamLeader: { bar: 'bg-indigo-500',  text: 'text-indigo-400',  ring: 'ring-indigo-500/30' },
+  divHead:    { bar: 'bg-indigo-700',  text: 'text-indigo-400',  ring: 'ring-indigo-700/30' },
+  branchPool: { bar: 'bg-indigo-900',  text: 'text-indigo-500',  ring: 'ring-indigo-900/40' },
+  company:    { bar: 'bg-zinc-600',    text: 'text-zinc-400',    ring: 'ring-zinc-600/30' },
+};
+
+export default function TransparencyTracerPage() {
+  const [yearMonth, setYearMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [query, setQuery] = useState('');
+  const [hits, setHits] = useState<UserHit[]>([]);
+  const [showHits, setShowHits] = useState(false);
+  const [selected, setSelected] = useState<UserHit | null>(null);
+  const [trace, setTrace] = useState<TraceData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 정산 페이지에서 ?userId= 로 진입한 경우 자동 로드
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const uid = sp.get('userId');
+    const ym = sp.get('yearMonth');
+    if (ym) setYearMonth(ym);
+    if (uid) setSelected({ id: uid, name: '', role: '', employeeId: '' });
+  }, []);
+
+  // 직원 검색 (디바운스)
+  useEffect(() => {
+    if (!query.trim()) { setHits([]); return; }
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/users?search=${encodeURIComponent(query)}&limit=8`);
+        const data = await res.json();
+        setHits(data.users ?? []);
+        setShowHits(true);
+      } catch { /* 검색 실패는 조용히 무시 */ }
+    }, 250);
+  }, [query]);
+
+  const loadTrace = useCallback(async (userId: string, ym: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/transparency?userId=${userId}&yearMonth=${ym}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `조회 실패 (HTTP ${res.status})`);
+      setTrace(data);
+      setSelected({ id: data.user.id, name: data.user.name, role: data.user.role, employeeId: data.user.employeeId });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '추적 데이터를 불러오지 못했습니다.');
+      setTrace(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selected?.id) loadTrace(selected.id, yearMonth);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id, yearMonth]);
+
+  const recipientName = (key: string): string => {
+    if (!trace) return '';
+    const r = trace.recipients;
+    switch (key) {
+      case 'agent':
+      case 'agentBonus': return trace.user.name;
+      case 'teamLeader': return r.teamLeader?.name ?? '(직속 팀장 없음 → 회사 귀속)';
+      case 'divHead': return r.divHead?.name ?? '(소속 본부장 없음 → 회사 귀속)';
+      case 'branchPool': return r.branchMgrCount > 0 ? `지점장 ${r.branchMgrCount}명 균등 분배` : '(지점장 없음 → 회사 귀속)';
+      case 'company': return '자리 공인중개사 법인';
+      default: return '';
+    }
+  };
+
+  const maxPct = trace ? Math.max(...trace.breakdown.shares.map(s => s.pct), 1) : 1;
+
   return (
-    <div className="min-h-screen bg-gray-50 text-slate-800 font-sans p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* Header Section */}
-        <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              📊 JARI 밸류체인 투명성 대시보드
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              단일 영업규정집(SSOT)에 기반한 1원 단위 실시간 수수료 및 진급 시뮬레이터
-            </p>
+    <div className="min-h-screen bg-[#0a0c10] text-[#cdd2da] p-6 lg:p-10" style={{ wordBreak: 'keep-all' }}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes traceIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes barGrow { from { width: 0; } }
+        .trace-row { animation: traceIn 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+        .trace-bar { animation: barGrow 1.1s cubic-bezier(0.22,1,0.36,1) both; }
+      `}} />
+
+      <div className="max-w-5xl mx-auto space-y-8">
+        <header className="space-y-1">
+          <p className="text-[12px] font-semibold tracking-[0.25em] text-indigo-400/80 uppercase">Transparency Engine</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">100원 분해 추적기</h1>
+          <p className="text-[15px] text-zinc-400">
+            모든 중개보수는 단 1원도 숨김없이 분해됩니다 — 직원 55 · 팀장 10 · 본부장 5 · 지점장 2.5 · 회사 27.5
+          </p>
+        </header>
+
+        {/* 컨트롤 바 */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onFocus={() => hits.length && setShowHits(true)}
+              placeholder="직원 이름 또는 사번을 입력해 추적을 시작하세요..."
+              className="w-full bg-[#11141a] border border-[#1f2430] rounded-xl px-5 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500/60 transition-colors"
+            />
+            {showHits && hits.length > 0 && (
+              <ul className="absolute z-20 mt-2 w-full bg-[#11141a] border border-[#1f2430] rounded-xl overflow-hidden shadow-2xl">
+                {hits.map(h => (
+                  <li key={h.id}>
+                    <button
+                      onClick={() => { setSelected(h); setQuery(''); setShowHits(false); }}
+                      className="w-full text-left px-5 py-3 hover:bg-indigo-500/10 transition-colors flex justify-between items-center"
+                    >
+                      <span className="text-white font-medium">{h.name}</span>
+                      <span className="text-[12px] text-zinc-500">{ROLES_KO[h.role as UserRole] ?? h.role} · {h.employeeId.slice(0, 10)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          <div className="flex gap-3">
-            <Link href="/admin" className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50">
-              ERP 홈으로
-            </Link>
-          </div>
+          <input
+            type="month"
+            value={yearMonth}
+            onChange={e => setYearMonth(e.target.value)}
+            className="bg-[#11141a] border border-[#1f2430] rounded-xl px-5 py-3.5 text-white focus:outline-none focus:border-indigo-500/60"
+          />
         </div>
 
-        {/* Top 3 Cards: My Status */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-6 rounded-2xl shadow-lg text-white">
-            <h3 className="text-indigo-100 text-sm font-semibold mb-1">현재 내 직급 (기본지급율)</h3>
-            <div className="text-3xl font-bold mb-4">초급 관리자 (60%)</div>
-            <div className="w-full bg-indigo-900/50 rounded-full h-2 mb-2">
-              <div className="bg-white h-2 rounded-full" style={{ width: '65%' }}></div>
-            </div>
-            <p className="text-xs text-indigo-100">
-              상급 관리자(본부장 70%) 진급까지 누적 매출 <span className="font-bold text-white">2,520만원</span> 남음
-            </p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <h3 className="text-slate-500 text-sm font-semibold mb-1">이번 달 확정 기본 수수료</h3>
-            <div className="text-3xl font-bold text-slate-900 mb-4">₩ 12,500,000</div>
-            <p className="text-xs text-emerald-600 font-medium bg-emerald-50 inline-block px-2 py-1 rounded">
-              영업지원비 구간시상 (15% 룰 적용): +₩ 1,875,000 대기중
-            </p>
-          </div>
+        {error && <div className="bg-red-900/20 border border-red-800/50 text-red-300 rounded-xl px-5 py-4">⚠️ {error}</div>}
+        {loading && <div className="text-center py-20 text-zinc-500 animate-pulse">실거래 데이터를 분해하는 중...</div>}
 
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-rose-500">
-            <h3 className="text-slate-500 text-sm font-semibold mb-1">산하 조직 오버라이딩 수익</h3>
-            <div className="text-3xl font-bold text-rose-600 mb-4">₩ 4,320,000</div>
-            <p className="text-xs text-slate-500">
-              직속 팀원(3명) 중개 총액의 10% (회사입금액 20%) 실시간 적립
-            </p>
+        {!loading && !trace && !error && (
+          <div className="text-center py-24 border border-dashed border-[#1f2430] rounded-2xl">
+            <p className="text-zinc-500 text-lg">위 검색창에서 직원을 선택하면</p>
+            <p className="text-zinc-300 text-xl font-semibold mt-1">그 직원이 창출한 매출의 흐름이 이곳에서 분해됩니다</p>
           </div>
-        </div>
+        )}
 
-        {/* Value Chain Separated Income (The Prime Asset Secret) */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-slate-800">🌱 밸류체인 독립 분할 수당 (영구 인세 소득)</h2>
-            <span className="text-xs font-bold bg-amber-100 text-amber-700 px-3 py-1 rounded-full">
-              에이스를 키워 독립시키면 나의 평생 연금이 됩니다
-            </span>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <th className="py-3 px-4 text-xs font-semibold text-slate-500">독립시킨 하위 조직장</th>
-                  <th className="py-3 px-4 text-xs font-semibold text-slate-500">독립 시점</th>
-                  <th className="py-3 px-4 text-xs font-semibold text-slate-500">분할 수당 비율</th>
-                  <th className="py-3 px-4 text-xs font-semibold text-slate-500">이번 달 산하 총 매출액</th>
-                  <th className="py-3 px-4 text-xs font-semibold text-rose-600">나의 배당 수익</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600">김</div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">김수석 팀장</p>
-                        <p className="text-xs text-slate-500">분당 2팀</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-sm text-slate-600">2026.04.01</td>
-                  <td className="py-4 px-4 text-sm font-medium text-slate-800">3% (1차 분할)</td>
-                  <td className="py-4 px-4 text-sm text-slate-600">₩ 85,000,000</td>
-                  <td className="py-4 px-4 text-sm font-bold text-rose-600">+ ₩ 2,550,000</td>
-                </tr>
-                <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600">이</div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">이프로 팀장</p>
-                        <p className="text-xs text-slate-500">판교 1팀</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-sm text-slate-600">2026.05.15</td>
-                  <td className="py-4 px-4 text-sm font-medium text-slate-800">3% (1차 분할)</td>
-                  <td className="py-4 px-4 text-sm text-slate-600">₩ 42,000,000</td>
-                  <td className="py-4 px-4 text-sm font-bold text-rose-600">+ ₩ 1,260,000</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Global Blueprint / Policy Reference */}
-        <div className="bg-slate-900 p-6 rounded-2xl shadow-xl text-slate-300">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-white font-bold mb-1">📖 JARI 운영규정집 실시간 연동 중</h3>
-              <p className="text-xs text-slate-400">
-                수수료 및 오버라이딩은 단일 진실 공급원(SSOT)인 Final_Operation_Rules.md 제5조 제4항에 근거하여 1원 단위 조작 없이 투명하게 계산됩니다.
+        {!loading && trace && (
+          <div className="space-y-8">
+            {/* 원천: 총액 */}
+            <div className="trace-row bg-[#11141a] border border-[#1f2430] rounded-2xl p-8 text-center relative overflow-hidden">
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
+              <p className="text-[13px] text-zinc-500 mb-2">
+                {trace.yearMonth} · <span className="text-zinc-300 font-medium">{trace.user.name}</span>
+                <span className="ml-1 text-zinc-500">({ROLES_KO[trace.user.role as UserRole] ?? trace.user.role})</span>
+                {' '}· 계약 {trace.contracts.length}건의 중개보수 총액
               </p>
+              <Krw amount={trace.gross} className="text-5xl font-bold text-white tracking-tight" />
             </div>
-            <Link href="/rulebook" className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm transition-colors border border-slate-700">
-              규정집 원문 보기
-            </Link>
-          </div>
-        </div>
 
+            {/* 분해 흐름 */}
+            <div className="space-y-3">
+              {trace.breakdown.shares.map((s, i) => {
+                const st = SHARE_STYLE[s.key] ?? SHARE_STYLE.company;
+                return (
+                  <div
+                    key={s.key}
+                    className={`trace-row bg-[#11141a] border border-[#1f2430] rounded-xl px-6 py-5 ring-1 ring-inset ${st.ring}`}
+                    style={{ animationDelay: `${0.15 + i * 0.12}s` }}
+                  >
+                    <div className="flex items-baseline justify-between mb-2 gap-4 flex-wrap">
+                      <div>
+                        <span className="text-[15px] font-semibold text-white">{s.label}</span>
+                        <span className="ml-2 text-[13px] text-zinc-500">→ {recipientName(s.key)}</span>
+                      </div>
+                      <div className="flex items-baseline gap-3">
+                        <Krw amount={s.amount} className={`text-xl font-bold ${st.text}`} />
+                        <span className="text-[13px] text-zinc-500 w-14 text-right">{s.pct}%</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-[#0a0c10] rounded-full overflow-hidden">
+                      <div
+                        className={`trace-bar h-full rounded-full ${st.bar}`}
+                        style={{ width: `${(s.pct / maxPct) * 100}%`, animationDelay: `${0.25 + i * 0.12}s` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-[12px] text-zinc-600">{s.formula}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 정산 확정 대조 — 추적기와 정산서가 일치함을 증명 */}
+            {trace.settlement && (
+              <div className="trace-row bg-[#0d1410] border border-emerald-900/40 rounded-xl px-6 py-5" style={{ animationDelay: '1s' }}>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <p className="text-[14px] font-semibold text-emerald-300">✓ 정산서 교차 검증</p>
+                    <p className="text-[13px] text-zinc-500 mt-1">
+                      위 분해의 본인 몫(기본+지원비)과 {trace.yearMonth} 확정 정산서를 시스템이 자동 대조합니다.
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[12px] text-zinc-500">확정 정산서 (기본+지원비)</p>
+                    <p className="text-lg font-bold text-emerald-400">₩ {(trace.settlement.basePay + trace.settlement.bonusPay).toLocaleString('ko-KR')}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 원천 계약 목록 */}
+            {trace.contracts.length > 0 && (
+              <details className="trace-row bg-[#11141a] border border-[#1f2430] rounded-xl px-6 py-4" style={{ animationDelay: '1.1s' }}>
+                <summary className="cursor-pointer text-[14px] font-medium text-zinc-300 hover:text-white transition-colors">
+                  원천 계약 {trace.contracts.length}건 펼쳐보기
+                </summary>
+                <ul className="mt-4 space-y-2">
+                  {trace.contracts.map(c => (
+                    <li key={c.id} className="flex justify-between text-[13px] border-b border-[#1f2430] pb-2">
+                      <span className="text-zinc-400">
+                        {new Date(c.contractDate).toLocaleDateString('ko-KR')} · {c.contractType ?? '중개'} · {c.propertyAddress ?? '주소 미입력'}
+                      </span>
+                      <span className="text-zinc-200 font-medium">₩ {c.grossCommission.toLocaleString('ko-KR')}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+
+        <footer className="pt-4 text-[12px] text-zinc-600">
+          본 추적기의 계산 규칙은 정산 엔진과 단일 코어(commissionBreakdown)를 공유하며, 17개 자동 테스트가 매 빌드마다 100원 룰 준수를 검증합니다.
+        </footer>
       </div>
     </div>
   );

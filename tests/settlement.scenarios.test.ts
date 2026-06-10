@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { prisma } from '@/lib/prisma';
 import { processMonthlySettlement } from '@/lib/settlementService';
+import { breakdownGross } from '@/lib/commissionBreakdown';
 import { ROLES } from '@/types';
 
 const YM = '2026-06';
@@ -140,6 +141,40 @@ describe('100원 룰 — 단건 분배의 정의 (SSOT_Commission_100won_Rule.md
 
     // 오버라이딩 제1원칙: 직원 몫(55%)은 어떤 관리자 체인에서도 불변
     expect(330 * 만 + 60 * 만 + 30 * 만 + 15 * 만 + 165 * 만).toBe(600 * 만);
+  });
+});
+
+describe('100원 분해 추적기 코어 — breakdownGross는 정산 엔진과 동일한 규칙이어야 한다', () => {
+  it('사원 600만: 본인 330만(55%) + 팀장 60 + 본부장 30 + 지점장 15 + 회사 165 = 정확히 600만', () => {
+    const b = breakdownGross(ROLES.REGULAR, 600 * 만);
+    const get = (k: string) => b.shares.find(s => s.key === k)!.amount;
+    expect(get('agent') + get('agentBonus')).toBe(330 * 만);
+    expect(get('teamLeader')).toBe(60 * 만);
+    expect(get('divHead')).toBe(30 * 만);
+    expect(get('branchPool')).toBe(15 * 만);
+    expect(get('company')).toBe(165 * 만);
+    expect(b.shares.reduce((s, x) => s + x.amount, 0)).toBe(600 * 만); // 1원도 새지 않는다
+  });
+
+  it('팀장 1,000만: 본인 640만(60%+지원비40) + 본부장 40 + 지점장 20 + 회사 300 (팀장 위로는 팀장 몫 없음)', () => {
+    const b = breakdownGross(ROLES.TEAM_LEADER, 1000 * 만);
+    const get = (k: string) => b.shares.find(s => s.key === k)!.amount;
+    expect(get('agent') + get('agentBonus')).toBe(640 * 만);
+    expect(get('teamLeader')).toBe(0);
+    expect(get('divHead')).toBe(40 * 만);
+    expect(get('branchPool')).toBe(20 * 만);
+    expect(get('company')).toBe(300 * 만);
+    expect(b.shares.reduce((s, x) => s + x.amount, 0)).toBe(1000 * 만);
+  });
+
+  it('어떤 직급·금액에서도 분해 합계는 총액과 일치한다 (보존 법칙)', () => {
+    for (const role of [ROLES.REGULAR, ROLES.TEAM_LEADER, ROLES.DIV_HEAD, ROLES.BRANCH_MGR]) {
+      for (const gross of [0, 90 * 만, 333 * 만, 1234 * 만, 9999 * 만]) {
+        const b = breakdownGross(role, gross);
+        const sum = b.shares.reduce((s, x) => s + x.amount, 0);
+        expect(Math.abs(sum - gross)).toBeLessThanOrEqual(5); // Math.floor 절사 오차 한도(원)
+      }
+    }
   });
 });
 

@@ -12,6 +12,7 @@ import { ROLES_KO, type UserRole } from '@/types';
 
 type SettlementRow = {
   id: string;
+  userId: string;
   user: { name: string; role: string; employeeId: string };
   basePay: number;
   bonusPay: number;
@@ -197,7 +198,13 @@ export default function AdminSettlementsPage() {
                 {!loading && rows.map(row => (
                   <tr key={row.id} className="text-slate-300 hover:bg-slate-700/30">
                     <td className="px-5 py-4 font-medium text-white">
-                      {row.user.name}
+                      <a
+                        href={`/admin/transparency?userId=${row.userId}&yearMonth=${yearMonth}`}
+                        className="hover:text-indigo-300 transition-colors"
+                        title="100원 분해 추적기에서 이 직원의 매출 흐름 보기"
+                      >
+                        {row.user.name} <span className="text-indigo-500/70 text-xs">⌕</span>
+                      </a>
                       <span className="text-xs text-slate-500 block">{row.user.employeeId}</span>
                     </td>
                     <td className="px-5 py-4">

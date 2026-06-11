@@ -1,0 +1,12 @@
+{
+  "chat_id": "8782071025",
+  "text": "🚀 [Zari ERP] 시스템 통신망 완벽하게 개통되었습니다! 테스트 삼아 객관식 버튼을 한 번 눌러보시겠습니까?",
+  "reply_markup": {
+    "inline_keyboard": [
+      [
+        { "text": "👍 완벽하군!", "callback_data": "OPTION_0" },
+        { "text": "👎 다시 확인해봐", "callback_data": "OPTION_1" }
+      ]
+    ]
+  }
+}

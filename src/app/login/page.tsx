@@ -2,20 +2,39 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAppStore } from '@/lib/store';
 
 export default function RecruitmentLandingPage() {
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const setUser = useAppStore(state => state.setUser);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
+    
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId, password })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        setUser(data.user);
+        router.push('/');
+      } else {
+        alert(data.error || '로그인에 실패했습니다.');
+        setIsLoading(false);
+      }
+    } catch (err) {
+      alert('서버 오류가 발생했습니다.');
       setIsLoading(false);
-      router.push('/');
-    }, 1500);
+    }
   };
 
   return (

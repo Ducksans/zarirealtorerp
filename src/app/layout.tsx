@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import AIAssistant from "@/components/AIAssistant";
 import ToastContainer from "@/components/ui/ToastContainer";
+import AuthProvider from "@/components/AuthProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,12 +32,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col relative bg-slate-950 text-slate-100">
-        <Navbar />
-        <main className="flex-1 md:ml-64 pt-14 md:pt-0 pb-16 md:pb-0 min-w-0">
-          {children}
-        </main>
-        <AIAssistant />
-        <ToastContainer />
+        <AuthProvider>
+          <Navbar />
+          <main className="flex-1 md:ml-64 pt-14 md:pt-0 pb-16 md:pb-0 min-w-0">
+            {children}
+          </main>
+          <AIAssistant />
+          <ToastContainer />
+        </AuthProvider>
       </body>
     </html>
   );

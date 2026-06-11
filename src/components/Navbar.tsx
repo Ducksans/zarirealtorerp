@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import { 
   LayoutDashboard, 
@@ -17,6 +17,7 @@ import {
 const navItems = [
   { name: '대시보드', href: '/', icon: LayoutDashboard },
   { name: '인사 관리', href: '/hr', icon: Users },
+  { name: '영업(CRM)', href: '/crm', icon: LayoutDashboard },
   { name: '계약 관리', href: '/contracts', icon: FileText },
   { name: '사내 게시판', href: '/notice', icon: MessageSquare },
   { name: '현장 대시보드', href: '/dashboard', icon: Map },
@@ -26,7 +27,15 @@ const navItems = [
 
 export default function Navbar() {
   const user = useAppStore((state) => state.user);
+  const setUser = useAppStore((state) => state.setUser);
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setUser(null);
+    router.push('/login');
+  };
 
   return (
     <>
@@ -57,12 +66,22 @@ export default function Navbar() {
           })}
         </div>
         <div className="p-4 border-t border-slate-800 shrink-0 bg-slate-900/50">
-          <div className="flex items-center gap-3 px-3 py-2 bg-slate-950 rounded-xl border border-slate-800">
-            <UserCircle className="text-indigo-400" size={32} />
-            <div className="text-sm min-w-0">
-              <p className="text-slate-500 text-xs">Welcome back,</p>
-              <p className="text-white font-bold truncate">{user?.name || 'Guest'}</p>
+          <div className="flex items-center justify-between px-3 py-2 bg-slate-950 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-3 min-w-0">
+              <UserCircle className="text-indigo-400 shrink-0" size={32} />
+              <div className="text-sm min-w-0">
+                <p className="text-slate-500 text-xs">Welcome back,</p>
+                <p className="text-white font-bold truncate">{user?.name || 'Guest'}</p>
+              </div>
             </div>
+            {user && (
+              <button 
+                onClick={handleLogout}
+                className="text-xs text-slate-400 hover:text-red-400 font-bold px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-colors shrink-0"
+              >
+                LOGOUT
+              </button>
+            )}
           </div>
         </div>
       </nav>

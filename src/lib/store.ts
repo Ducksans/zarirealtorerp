@@ -17,11 +17,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  user: {
-    id: 'usr_1',
-    name: 'John Doe',
-    role: 'Agent',
-  }, // Initial dummy user
+  user: null,
   sidebarOpen: false,
   theme: 'dark',
   setUser: (user) => set({ user }),

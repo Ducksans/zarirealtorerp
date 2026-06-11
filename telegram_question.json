@@ -1,0 +1,12 @@
+{
+  "chat_id": "8782071025",
+  "text": "대표님, 6시간 작전 중 첫 번째 관문입니다. CRM 영업 파이프라인(퍼널) 단계를 어떻게 구성할까요? (DB 스키마에 바로 반영됩니다)",
+  "reply_markup": {
+    "inline_keyboard": [
+      [
+        { "text": "👉 [단순형] 채택", "callback_data": "OPTION_0" },
+        { "text": "👉 [상세형] 채택", "callback_data": "OPTION_1" }
+      ]
+    ]
+  }
+}

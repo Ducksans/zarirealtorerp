@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Info } from 'lucide-react';
 
 type User = {
   id: string;
@@ -139,9 +140,18 @@ export default function ContractTable({ contracts, loading, searchTerm, onSearch
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 text-xs rounded-full border ${c.signatureStatus === 'SIGNED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
-                      {c.signatureStatus === 'SIGNED' ? '결재완료' : '결재대기'}
-                    </span>
+                    <div className="relative group/tooltip inline-block">
+                      <span className={`px-2 py-1 text-xs rounded-full border cursor-help flex items-center gap-1 ${c.signatureStatus === 'SIGNED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                        {c.signatureStatus === 'SIGNED' ? '결재완료' : '결재대기'}
+                        <Info className="w-3 h-3 opacity-70" />
+                      </span>
+                      {/* Tooltip */}
+                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover/tooltip:block w-max max-w-[200px] bg-slate-800 text-slate-300 text-[11px] px-3 py-2 rounded shadow-lg border border-slate-700 z-50 whitespace-normal text-center">
+                        {c.signatureStatus === 'SIGNED' ? '전자결재가 완료되어 익월 정산 대상에 포함되었습니다.' : '본부장 및 대표의 최종 서명이 필요한 기안입니다.'}
+                        {/* Tooltip arrow */}
+                        <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-700"></div>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-right text-emerald-400 font-medium tracking-wider">{formatKrw(c.grossCommission)}</td>
                   <td className="px-6 py-4 text-right">
@@ -195,7 +205,14 @@ export default function ContractTable({ contracts, loading, searchTerm, onSearch
                 {expandedId === c.id && (!c.transactions || c.transactions.length === 0) && (
                   <tr className="bg-slate-900/60 border-t border-slate-700/50">
                     <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500 tracking-wide">
-                      정산 내역이 없습니다. (월 마감 전)
+                      <div className="relative group/tooltip inline-flex items-center justify-center gap-2 cursor-help">
+                        <span>정산 내역이 없습니다. (월 마감 전)</span>
+                        <Info className="w-4 h-4 text-slate-400" />
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover/tooltip:block w-max max-w-[250px] bg-slate-800 text-slate-300 text-[11px] px-3 py-2 rounded shadow-lg border border-slate-700 z-50 text-center">
+                          수수료 정산 내역은 월말 결산 배치(Batch) 작업 후 일괄 생성됩니다.
+                          <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-700"></div>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 )}

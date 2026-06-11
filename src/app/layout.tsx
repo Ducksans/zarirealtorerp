@@ -8,7 +8,7 @@ backlinks: []
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import DevHeader from '@/components/dev/DevHeader';
+import GlobalNav from '@/components/GlobalNav';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,7 +38,7 @@ export default function RootLayout({
       {/* overflow-hidden 제거: 관제탑(/dev)은 자체적으로 내부 스크롤을 관리하고,
           일반 페이지는 문서 흐름대로 스크롤되어야 한다 (2026-06-11 하단 잘림 버그 수정) */}
       <body className="min-h-full flex flex-col">
-        <DevHeader />
+        <GlobalNav />
         {children}
       </body>
     </html>

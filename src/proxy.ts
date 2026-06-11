@@ -30,6 +30,7 @@ const PUBLIC_PREFIXES = [
   '/login',
   '/onboarding',
   '/trust',
+  '/card',
   '/showcase',
   '/web',
   '/rulebook',

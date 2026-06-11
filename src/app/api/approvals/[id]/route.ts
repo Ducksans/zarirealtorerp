@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { approveRequest, rejectRequest } from '@/services/approvalService';
+import { getSession } from '@/lib/auth';
 import { z } from 'zod';
 
 const approvalSchema = z.object({
@@ -10,15 +11,19 @@ const approvalSchema = z.object({
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const userId = session.user?.id || 'SYSTEM';
+
     const { id } = await params;
     const body = await req.json();
     const validatedData = approvalSchema.parse(body);
 
     if (validatedData.action === 'APPROVE') {
-      const updated = await approveRequest(id, validatedData.role || '', validatedData.memo || '');
+      const updated = await approveRequest(id, validatedData.role || '', validatedData.memo || '', userId);
       return NextResponse.json({ data: updated });
     } else if (validatedData.action === 'REJECT') {
-      const updated = await rejectRequest(id);
+      const updated = await rejectRequest(id, userId);
       return NextResponse.json({ data: updated });
     }
     

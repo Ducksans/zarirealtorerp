@@ -132,6 +132,17 @@ export async function processMonthlySettlement(yearMonth: string) {
     await tx.settlement.deleteMany({ where: { yearMonth } });
     await tx.settlement.createMany({ data: createData });
 
+    await tx.auditLog.create({
+      data: {
+        action: 'CREATE',
+        entity: 'SETTLEMENT_BATCH',
+        entityId: yearMonth,
+        actorId: 'SYSTEM',
+        afterData: JSON.stringify({ count: createData.length }),
+        reason: `${yearMonth} 월간 정산 일괄 실행`
+      }
+    });
+
     return createData;
   }, {
     timeout: 30000  // 615명 정산을 위한 넉넉한 타임아웃

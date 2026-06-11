@@ -11,8 +11,7 @@ export default function Dashboard() {
   const user = useAppStore(state => state.user);
   
   // SWR Hooks with suspense
-  const { data: stats, error: statsError } = useSWR('/api/dashboard/stats', fetcher, { suspense: true, fallbackData: {} });
-  const { data: activity, error: activityError } = useSWR('/api/dashboard/activity', fetcher, { suspense: true, fallbackData: [] });
+  const { data: mainData, error: mainError } = useSWR<any>('/api/dashboard/main', fetcher, { suspense: true });
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
@@ -27,7 +26,7 @@ export default function Dashboard() {
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
 
-  if (statsError || activityError) {
+  if (mainError) {
     throw new Error("Failed to load dashboard data");
   }
 
@@ -99,10 +98,10 @@ export default function Dashboard() {
 
         {/* Quick Stats Carousel (Mobile) / Grid (Desktop) */}
         <motion.div variants={itemVariants} className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory hide-scrollbar md:grid md:grid-cols-4 md:overflow-visible md:pb-0">
-          <StatCard title="Target Progress" value={(stats as any)?.progress} icon={<Activity className="w-5 h-5 text-blue-400"/>} trend={(stats as any)?.progressTrend} color="blue" />
-          <StatCard title="Commission" value={(stats as any)?.commission} icon={<DollarSign className="w-5 h-5 text-emerald-400"/>} trend={(stats as any)?.commissionTrend} color="emerald" />
-          <StatCard title="Active Listings" value={(stats as any)?.activeListings} icon={<TrendingUp className="w-5 h-5 text-purple-400"/>} trend={(stats as any)?.listingsTrend} color="purple" />
-          <StatCard title="New Leads" value={(stats as any)?.newLeads} icon={<Users className="w-5 h-5 text-orange-400"/>} trend={(stats as any)?.leadsTrend} color="orange" />
+          <StatCard title="Active Agents" value={mainData?.metrics?.activeAgents || 0} icon={<Users className="w-5 h-5 text-blue-400"/>} color="blue" />
+          <StatCard title="Total Revenue" value={`₩${(mainData?.metrics?.totalRevenue || 0).toLocaleString()}`} icon={<DollarSign className="w-5 h-5 text-emerald-400"/>} color="emerald" />
+          <StatCard title="Pending Contracts" value={mainData?.metrics?.pendingContracts || 0} icon={<Activity className="w-5 h-5 text-purple-400"/>} color="purple" />
+          <StatCard title="Top Agent" value={mainData?.leaderboard?.[0]?.name || 'N/A'} icon={<TrendingUp className="w-5 h-5 text-orange-400"/>} color="orange" />
         </motion.div>
 
         {/* Prominent Verified Listings Section */}
@@ -130,14 +129,12 @@ export default function Dashboard() {
             variants={containerVariants}
             className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 relative z-10"
           >
-            {(activity as any)?.map((item: any, i: number) => (
-              <motion.div key={item.id} variants={itemVariants} whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }} className={i === 2 ? "hidden xl:block" : ""}>
-                <VerifiedListing 
-                  address={item.address}
-                  timestamp={item.timestamp}
-                  imageUrl={item.imageUrl}
-                  gpsCoords={item.gpsCoords}
-                />
+            {mainData?.leaderboard?.map((agent: any, i: number) => (
+              <motion.div key={agent.id} variants={itemVariants} whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }} className={i === 2 ? "hidden xl:block" : ""}>
+                <div className="glass-panel p-4 rounded-xl border border-white/5 bg-slate-800/50">
+                  <h3 className="font-bold text-white">{agent.name} <span className="text-sm text-slate-400">({agent.role})</span></h3>
+                  <p className="text-emerald-400 mt-2 font-semibold">₩{agent.sales.toLocaleString()} <span className="text-xs text-slate-500">이달 매출</span></p>
+                </div>
               </motion.div>
             ))}
           </motion.div>

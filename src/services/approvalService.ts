@@ -20,7 +20,7 @@ export async function getApprovalById(id: string) {
   });
 }
 
-export async function approveRequest(id: string, role: string, memo: string) {
+export async function approveRequest(id: string, role: string, memo: string, userId: string) {
   const req = await prisma.onboardingRequest.findUnique({ where: { id } });
   if (!req) throw new Error('Request not found');
 
@@ -45,15 +45,24 @@ export async function approveRequest(id: string, role: string, memo: string) {
 
   updateData.status = nextStatus;
 
-  const result = await prisma.$transaction(async (tx) => {
+  return await prisma.$transaction(async (tx) => {
     const updated = await tx.onboardingRequest.update({
       where: { id },
       data: updateData
     });
 
+    await tx.auditLog.create({
+      data: {
+        action: 'APPROVE',
+        entity: 'ONBOARDING_REQUEST',
+        entityId: id,
+        actorId: userId,
+        afterData: JSON.stringify(updated),
+        reason: memo
+      }
+    });
+
     if (nextStatus === 'APPROVED') {
-      // Create User
-      // Generate a new employee ID
       const newUserId = `EMP-${Date.now().toString().slice(-6)}`;
       await tx.user.create({
         data: {
@@ -72,13 +81,28 @@ export async function approveRequest(id: string, role: string, memo: string) {
 
     return updated;
   });
-
-  return result;
 }
 
-export async function rejectRequest(id: string) {
-  return await prisma.onboardingRequest.update({
-    where: { id },
-    data: { status: 'REJECTED' }
+export async function rejectRequest(id: string, userId: string = 'SYSTEM', reason: string = '전자결재 반려') {
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.onboardingRequest.findUnique({ where: { id } });
+    const updated = await tx.onboardingRequest.update({
+      where: { id },
+      data: { status: 'REJECTED' }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        action: 'UPDATE',
+        entity: 'ONBOARDING_REQUEST',
+        entityId: id,
+        actorId: userId,
+        beforeData: JSON.stringify(existing),
+        afterData: JSON.stringify(updated),
+        reason
+      }
+    });
+
+    return updated;
   });
 }

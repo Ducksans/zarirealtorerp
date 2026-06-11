@@ -8,6 +8,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { AppError } from '@/lib/errorHandler';
+import { logAudit } from '@/lib/audit';
 
 export async function getNotices() {
   const notices = await prisma.notice.findMany({
@@ -21,12 +22,27 @@ export async function createNotice(title: string, content: string, authorId: str
     throw new AppError('제목과 내용은 필수 항목입니다.', 400);
   }
 
-  const notice = await prisma.notice.create({
-    data: {
-      title,
-      content,
-      authorId: authorId || 'ADMIN'
-    }
+  const notice = await prisma.$transaction(async (tx) => {
+    const newNotice = await tx.notice.create({
+      data: {
+        title,
+        content,
+        authorId: authorId || 'ADMIN'
+      }
+    });
+    
+    await tx.auditLog.create({
+      data: {
+        action: 'CREATE',
+        entity: 'NOTICE',
+        entityId: newNotice.id,
+        actorId: authorId || 'ADMIN',
+        afterData: JSON.stringify(newNotice),
+        reason: '공지사항 작성'
+      }
+    });
+    
+    return newNotice;
   });
 
   return notice;
@@ -42,6 +58,20 @@ export async function deleteNotice(id: string) {
     throw new AppError('공지사항을 찾을 수 없습니다.', 404);
   }
 
-  await prisma.notice.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.notice.delete({ where: { id } });
+    
+    await tx.auditLog.create({
+      data: {
+        action: 'DELETE',
+        entity: 'NOTICE',
+        entityId: id,
+        actorId: 'SYSTEM',
+        beforeData: JSON.stringify(existing),
+        reason: '공지사항 삭제'
+      }
+    });
+  });
+  
   return true;
 }

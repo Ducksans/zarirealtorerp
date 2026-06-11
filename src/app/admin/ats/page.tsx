@@ -1,16 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import useSWR from 'swr';
+import { Loader2 } from 'lucide-react';
 import { toastSuccess } from '@/lib/toast';
 
-// Mock Data for ATS (Applicant Tracking System)
-const INITIAL_CANDIDATES = [
-  { id: 'c1', name: '이열정', position: '주택 중개팀', stage: 'NEW', aiScore: 92, appliedAt: '2026-06-08', phone: '010-1111-2222' },
-  { id: 'c2', name: '박경험', position: '상가/빌딩팀', stage: 'RECRUITER', aiScore: 85, appliedAt: '2026-06-07', phone: '010-3333-4444' },
-  { id: 'c3', name: '최신입', position: '토지 개발팀', stage: 'PRACTICAL', aiScore: 88, appliedAt: '2026-06-05', phone: '010-5555-6666' },
-  { id: 'c4', name: '정신뢰', position: '주택 중개팀', stage: 'MANAGER', aiScore: 95, appliedAt: '2026-06-03', phone: '010-7777-8888' },
-  { id: 'c5', name: '김성실', position: '상가/빌딩팀', stage: 'FINAL', aiScore: 98, appliedAt: '2026-06-01', phone: '010-9999-0000' },
-];
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 const COLUMNS = [
   { id: 'NEW', title: '신규 지원', color: 'border-slate-500' },
@@ -21,17 +15,32 @@ const COLUMNS = [
 ];
 
 export default function ATSKanbanBoard() {
-  const [candidates, setCandidates] = useState(INITIAL_CANDIDATES);
+  const { data: candidates, error, mutate } = useSWR('/api/ats', fetcher);
 
-  // 간단한 칸반 이동 시뮬레이션
-  const moveCandidate = (id: string, currentStageIndex: number) => {
+  const moveCandidate = async (id: string, currentStageIndex: number) => {
     if (currentStageIndex >= COLUMNS.length - 1) {
       toastSuccess('최종 승인이 완료되어 정식 온보딩(마일스톤 5) 파이프라인으로 이관됩니다.');
       return;
     }
     const nextStage = COLUMNS[currentStageIndex + 1].id;
-    setCandidates(candidates.map(c => c.id === id ? { ...c, stage: nextStage } : c));
+    
+    // Optimistic update
+    mutate(candidates.map((c: any) => c.id === id ? { ...c, stage: nextStage } : c), false);
+    
+    await fetch(`/api/ats/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage: nextStage })
+    });
+    mutate();
   };
+
+  if (error) return <div className="p-10 text-red-400">데이터 로드 실패</div>;
+  if (!candidates) return (
+    <div className="min-h-screen bg-[#050508] flex items-center justify-center">
+      <Loader2 className="w-12 h-12 text-indigo-500 animate-spin" />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#050508] text-slate-100 p-6 lg:p-10 font-sans overflow-x-hidden">
@@ -68,15 +77,15 @@ export default function ATSKanbanBoard() {
               <div className={`p-4 border-b-2 ${column.color} bg-slate-900/80 rounded-t-2xl flex justify-between items-center`}>
                 <h2 className="font-bold text-white text-sm tracking-wide">{column.title}</h2>
                 <span className="bg-slate-800 text-slate-300 text-xs px-2.5 py-1 rounded-full font-mono">
-                  {candidates.filter(c => c.stage === column.id).length}
+                  {candidates.filter((c: any) => c.stage === column.id).length}
                 </span>
               </div>
 
               {/* Candidates List */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
                 {candidates
-                  .filter(c => c.stage === column.id)
-                  .map(candidate => (
+                  .filter((c: any) => c.stage === column.id)
+                  .map((candidate: any) => (
                     <div 
                       key={candidate.id}
                       className="bg-slate-950 border border-slate-700 rounded-xl p-5 cursor-pointer hover:border-indigo-500 hover:shadow-[0_0_20px_rgba(79,70,229,0.15)] transition-all group"

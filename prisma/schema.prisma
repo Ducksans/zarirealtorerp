@@ -201,6 +201,19 @@ model OnboardingRequest {
   updatedAt       DateTime @updatedAt
 }
 
+model AtsCandidate {
+  id        String   @id @default(uuid())
+  name      String
+  position  String
+  stage     String   @default("NEW")
+  aiScore   Int
+  appliedAt String
+  phone     String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // -----------------------------------------
 // Trust Infrastructure: Dual Flywheel Models
 // -----------------------------------------

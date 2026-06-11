@@ -12,7 +12,7 @@ const fetcher = (url: string) => fetch(url).then(res => {
 });
 
 export default function CRMPage() {
-  const { data: leads, error, mutate } = useSWR('/api/crm', fetcher);
+  const { data: leads, error, mutate } = useSWR('/api/crm', fetcher, { suspense: true });
   const [isAdding, setIsAdding] = useState(false);
   
   // New Lead Form
@@ -59,6 +59,17 @@ export default function CRMPage() {
     if (!confirm('정말 삭제하시겠습니까?')) return;
     await fetch(`/api/crm/${id}`, { method: 'DELETE' });
     mutate();
+  };
+
+  const convertLead = async (id: string) => {
+    if (!confirm('해당 리드를 실제 고객 원장(M5)으로 이관하시겠습니까?')) return;
+    const res = await fetch(`/api/crm/${id}/convert`, { method: 'POST' });
+    if (res.ok) {
+      alert('고객 원장으로 성공적으로 이관되었습니다!');
+      mutate();
+    } else {
+      alert('이관에 실패했습니다.');
+    }
   };
 
   if (error) return <div className="p-8 text-red-400">데이터를 불러오지 못했습니다. 로그인 상태를 확인하세요.</div>;
@@ -139,6 +150,14 @@ export default function CRMPage() {
                           <Wrench className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" /> 
                           <span className="line-clamp-2">{lead.notes}</span>
                         </div>
+                      )}
+                      {(stage === '가계약' || stage === '최종계약') && (
+                        <button
+                          onClick={() => convertLead(lead.id)}
+                          className="w-full mt-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold py-2 rounded border border-emerald-500/20 transition-colors flex items-center justify-center gap-1"
+                        >
+                          원장으로 이관하기
+                        </button>
                       )}
                     </div>
                     

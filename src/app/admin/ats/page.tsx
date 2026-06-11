@@ -15,7 +15,7 @@ const COLUMNS = [
 ];
 
 export default function ATSKanbanBoard() {
-  const { data: candidates, error, mutate } = useSWR('/api/ats', fetcher);
+  const { data: candidates, error, mutate } = useSWR('/api/ats', fetcher, { suspense: true });
 
   const moveCandidate = async (id: string, currentStageIndex: number) => {
     if (currentStageIndex >= COLUMNS.length - 1) {

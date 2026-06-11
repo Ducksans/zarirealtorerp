@@ -15,7 +15,7 @@ type Notice = {
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 export default function NoticeBoard() {
-  const { data: notices, error, isLoading, mutate } = useSWR<Notice[]>('/api/notices', fetcher);
+  const { data: notices, error, isLoading, mutate } = useSWR<Notice[]>('/api/notices', fetcher, { suspense: true });
   const [formData, setFormData] = useState({ title: '', content: '' });
   const [isComposing, setIsComposing] = useState(false);
 

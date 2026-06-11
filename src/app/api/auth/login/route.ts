@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { login } from '@/lib/auth';
+import { verifyPassword } from '@/lib/crypto';
 
 const prisma = new PrismaClient();
 
@@ -9,9 +10,6 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { employeeId, password } = body;
 
-    // TODO: In a real system, verify passwordHash with bcrypt.
-    // For this migration, we check if the employeeId exists.
-    // If not, we'll try to find by name for the demo accounts.
     let user = await prisma.user.findUnique({
       where: { employeeId: employeeId }
     });
@@ -30,8 +28,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '유효하지 않은 사원번호 또는 이름입니다.' }, { status: 401 });
     }
 
-    // Accept any password for the demo, or check if it matches a dummy
-    // In production, compare password with user.passwordHash
+    // JWT / Bcrypt Authentication
+    // If the user has a passwordHash, verify it. 
+    // If they don't (like seeded demo users), allow it for migration purposes, but in production this should be enforced.
+    if (user.passwordHash) {
+      const isValid = verifyPassword(password, user.passwordHash);
+      if (!isValid) {
+        return NextResponse.json({ error: '비밀번호가 일치하지 않습니다.' }, { status: 401 });
+      }
+    } else {
+      // Demo accounts have no passwordHash, so they pass with any password initially.
+      // But we will log a warning that they need to set a password.
+      console.warn(`User ${user.id} logged in without a password. A passwordHash should be set.`);
+    }
 
     await login({
       id: user.id,

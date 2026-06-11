@@ -66,7 +66,7 @@ const SwipeableCard = ({ req, isActive, onClick, onApprove, onReject }: any) => 
 };
 
 export default function ApprovalDashboard() {
-  const { data: responseData, error, isLoading, mutate } = useSWR('/api/approvals', fetcher);
+  const { data: responseData, error, isLoading, mutate } = useSWR('/api/approvals', fetcher, { suspense: true });
   const requests = responseData?.data || [];
   
   const handleSwipeApprove = async (req: any) => {

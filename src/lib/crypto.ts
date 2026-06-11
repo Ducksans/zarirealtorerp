@@ -23,3 +23,23 @@ export function decrypt(text: string): string {
   decrypted = Buffer.concat([decrypted, decipher.final()]);
   return decrypted.toString();
 }
+
+/**
+ * Hash a password using scrypt
+ */
+export function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  // scryptSync(password, salt, keylen)
+  const derivedKey = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${derivedKey}`;
+}
+
+/**
+ * Verify a password against a hash
+ */
+export function verifyPassword(password: string, hash: string): boolean {
+  if (!hash || !hash.includes(':')) return false;
+  const [salt, key] = hash.split(':');
+  const derivedKey = crypto.scryptSync(password, salt, 64).toString('hex');
+  return key === derivedKey;
+}

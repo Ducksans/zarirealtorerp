@@ -1,53 +1,71 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import useSWR, { mutate } from 'swr';
+import { Loader2 } from 'lucide-react';
+import { toastSuccess, toastError } from '@/lib/toast';
 
-// 더미 데이터 세팅
-const ROLES = [
-  { id: '1', name: 'CEO', displayName: '대표', users: 1 },
-  { id: '2', name: 'ADMIN', displayName: '총무', users: 3 },
-  { id: '3', name: 'BRANCH_MGR', displayName: '지점장', users: 5 },
-  { id: '4', name: 'DIV_HEAD', displayName: '본부장', users: 12 },
-  { id: '5', name: 'TEAM_LEADER', displayName: '팀장', users: 45 },
-  { id: '6', name: 'REGULAR', displayName: '직원', users: 549 },
-];
-
-const PERMISSIONS = [
-  { category: '대시보드 (Dashboard)', items: [
-    { id: 'VIEW_REVENUE', label: '전사 누적 매출 열람' },
-    { id: 'VIEW_LEADERBOARD', label: '이달의 탑 퍼포머 열람' },
-  ]},
-  { category: '인사 관리 (HR)', items: [
-    { id: 'CREATE_USER', label: '신규 사원 등록' },
-    { id: 'EDIT_USER_INFO', label: '사원 개인정보 수정' },
-    { id: 'DELETE_USER', label: '사원 퇴사 처리 (Soft Delete)' },
-    { id: 'VIEW_AUDIT_LOG', label: 'Audit Log (변경 이력) 열람' },
-  ]},
-  { category: '계약 관리 (Contracts)', items: [
-    { id: 'CREATE_CONTRACT', label: '신규 계약 등록' },
-    { id: 'APPROVE_CONTRACT', label: '계약 건 전자결재 승인' },
-    { id: 'DELETE_CONTRACT', label: '계약 건 삭제' },
-  ]},
-  { category: '정산 및 급여 (Settlements)', items: [
-    { id: 'VIEW_ALL_SETTLEMENTS', label: '전사 급여 명세서 열람' },
-    { id: 'APPROVE_SETTLEMENTS', label: '월간 정산 일괄 승인' },
-    { id: 'EDIT_PAYROLL', label: '명세서 수기 수정' },
-  ]}
-];
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 export default function RolePermissionManagement() {
-  const [activeRole, setActiveRole] = useState(ROLES[0]);
+  const { data, error } = useSWR('/api/roles', fetcher, { suspense: true });
   
-  // 더미 상태: 대표(CEO)는 모든 권한 true, 직원은 일부만 true
-  const [toggles, setToggles] = useState<Record<string, boolean>>({
-    'VIEW_REVENUE': true,
-    'CREATE_USER': true,
-    'VIEW_ALL_SETTLEMENTS': true,
-  });
+  const [activeRole, setActiveRole] = useState<any>(null);
+  const [toggles, setToggles] = useState<Record<string, boolean>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (data?.roles?.length > 0 && !activeRole) {
+      setActiveRole(data.roles[0]);
+    }
+  }, [data, activeRole]);
+
+  useEffect(() => {
+    if (activeRole) {
+      const activePerms: Record<string, boolean> = {};
+      activeRole.permissions.forEach((rp: any) => {
+        activePerms[rp.permissionId] = true;
+      });
+      setToggles(activePerms);
+    }
+  }, [activeRole]);
+
+  if (error) return <div>Failed to load roles data.</div>;
+  if (!data || !activeRole) return <div>Loading...</div>;
+
+  const ROLES = data.roles;
+  const PERMISSIONS_RAW = data.permissions;
+
+  // Group permissions logically (in a real app, category might be a DB field, here we group broadly)
+  const PERMISSIONS = [
+    { category: '시스템 및 관리 (System)', items: PERMISSIONS_RAW }
+  ];
 
   const handleToggle = (permId: string) => {
     setToggles(prev => ({ ...prev, [permId]: !prev[permId] }));
   };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const selectedPerms = Object.keys(toggles).filter(k => toggles[k]);
+      const res = await fetch(`/api/roles/${activeRole.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissionIds: selectedPerms })
+      });
+      if (!res.ok) throw new Error('저장 실패');
+      
+      toastSuccess('권한 설정이 저장되었습니다.');
+      mutate('/api/roles');
+    } catch (e: any) {
+      toastError(e.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-10 font-sans">
@@ -87,7 +105,7 @@ export default function RolePermissionManagement() {
                     <div className="text-xs text-slate-500 mt-1">{role.name}</div>
                   </div>
                   <div className="text-xs bg-slate-800 text-slate-400 px-2 py-1 rounded-md">
-                    {role.users}명
+                    {role.users?.length || 0}명
                   </div>
                 </button>
               ))}
@@ -103,7 +121,12 @@ export default function RolePermissionManagement() {
                 </h2>
                 <p className="text-xs text-slate-400 mt-1">이 변경 사항은 실시간으로 모든 {activeRole.displayName} 사용자에게 적용됩니다.</p>
               </div>
-              <button className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+              <button 
+                onClick={handleSave}
+                disabled={isSaving}
+                className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors shadow-[0_0_15px_rgba(99,102,241,0.3)] flex items-center gap-2"
+              >
+                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                 변경 사항 저장
               </button>
             </div>
@@ -118,8 +141,8 @@ export default function RolePermissionManagement() {
                     {group.items.map(perm => (
                       <div key={perm.id} className="flex items-center justify-between p-4 bg-slate-950 border border-slate-800 rounded-xl hover:border-slate-700 transition-colors">
                         <div>
-                          <div className="font-semibold text-slate-200 text-sm">{perm.label}</div>
-                          <div className="text-xs text-slate-500 mt-0.5 font-mono">{perm.id}</div>
+                          <div className="font-semibold text-slate-200 text-sm">{perm.description || perm.action}</div>
+                          <div className="text-xs text-slate-500 mt-0.5 font-mono">{perm.action}</div>
                         </div>
                         {/* Custom Toggle Switch */}
                         <button 

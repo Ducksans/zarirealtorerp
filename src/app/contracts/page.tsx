@@ -51,7 +51,8 @@ export default function ContractManagement() {
 
   const { data, error, isLoading, mutate } = useSWR<{contracts: Contract[]}>(
     `/api/contracts?search=${encodeURIComponent(debouncedSearch)}`,
-    fetcher
+    fetcher,
+    { suspense: true }
   );
 
   const contracts = data?.contracts || [];

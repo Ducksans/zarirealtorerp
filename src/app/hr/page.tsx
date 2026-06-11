@@ -39,7 +39,7 @@ export default function HRManagement() {
 
   const fetcher = (url: string) => fetch(url).then(r => r.json());
   const queryUrl = `/api/users?search=${encodeURIComponent(debouncedSearch)}&role=${roleFilter}&status=${statusFilter}&page=${page}&limit=${limit}`;
-  const { data, error, isLoading: loading, mutate } = useSWR(queryUrl, fetcher);
+  const { data, error, isLoading: loading, mutate } = useSWR(queryUrl, fetcher, { suspense: true });
 
   const users = data?.users || [];
   const totalCount = data?.total || 0;

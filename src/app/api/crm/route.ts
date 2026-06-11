@@ -31,16 +31,31 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { customerName, contactInfo, propertyType, budget, notes } = body;
 
-    const lead = await prisma.crmLead.create({
-      data: {
-        agentId: session.user.id,
-        customerName,
-        contactInfo,
-        propertyType,
-        budget: parseInt(budget) || null,
-        stage: '신규접수',
-        notes
-      }
+    const lead = await prisma.$transaction(async (tx) => {
+      const newLead = await tx.crmLead.create({
+        data: {
+          agentId: session.user.id,
+          customerName,
+          contactInfo,
+          propertyType,
+          budget: parseInt(budget) || null,
+          stage: '신규접수',
+          notes
+        }
+      });
+      
+      await tx.auditLog.create({
+        data: {
+          action: 'CREATE',
+          entity: 'CRM_LEAD',
+          entityId: newLead.id,
+          actorId: session.user.id,
+          afterData: JSON.stringify(newLead),
+          reason: '신규 CRM 리드 등록'
+        }
+      });
+      
+      return newLead;
     });
 
     return NextResponse.json({ success: true, lead });

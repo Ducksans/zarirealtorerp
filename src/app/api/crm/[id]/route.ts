@@ -13,9 +13,26 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const body = await request.json();
     const { stage } = body;
 
-    const lead = await prisma.crmLead.update({
-      where: { id: params.id },
-      data: { stage }
+    const lead = await prisma.$transaction(async (tx) => {
+      const existing = await tx.crmLead.findUnique({ where: { id: params.id } });
+      const updated = await tx.crmLead.update({
+        where: { id: params.id },
+        data: { stage }
+      });
+      
+      await tx.auditLog.create({
+        data: {
+          action: 'UPDATE',
+          entity: 'CRM_LEAD',
+          entityId: updated.id,
+          actorId: session.user.id,
+          beforeData: JSON.stringify(existing),
+          afterData: JSON.stringify(updated),
+          reason: `CRM 리드 스테이지 변경: ${stage}`
+        }
+      });
+      
+      return updated;
     });
 
     return NextResponse.json({ success: true, lead });
@@ -30,8 +47,21 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    await prisma.crmLead.delete({
-      where: { id: params.id }
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.crmLead.findUnique({ where: { id: params.id } });
+      if (existing) {
+        await tx.crmLead.delete({ where: { id: params.id } });
+        await tx.auditLog.create({
+          data: {
+            action: 'DELETE',
+            entity: 'CRM_LEAD',
+            entityId: params.id,
+            actorId: session.user.id,
+            beforeData: JSON.stringify(existing),
+            reason: 'CRM 리드 삭제'
+          }
+        });
+      }
     });
 
     return NextResponse.json({ success: true });

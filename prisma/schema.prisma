@@ -83,6 +83,8 @@ model User {
   sourcedTransactions  SettlementTransaction[] @relation("SettlementSource")
   verifiedListings     VerifiedListing[]
   crmLeads             CrmLead[] @relation("AgentLeads")
+  customers            CustomerLedger[] @relation("AgentCustomers")
+  properties           PropertyLedger[] @relation("AgentProperties")
 }
 
 model UserDocument {
@@ -292,3 +294,48 @@ model CrmLead {
   @@index([stage])
 }
 
+// -----------------------------------------
+// M4 & M5: 원장 관리 (Ledgers)
+// -----------------------------------------
+model CustomerLedger {
+  id            String   @id @default(cuid())
+  agentId       String
+  agent         User     @relation("AgentCustomers", fields: [agentId], references: [id])
+  
+  name          String
+  phone         String
+  customerType  String   // "임대인", "임차인", "매도인", "매수인", "기타"
+  notes         String?
+  
+  properties    PropertyLedger[] @relation("PropertyOwner")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([customerType])
+}
+
+model PropertyLedger {
+  id            String   @id @default(cuid())
+  agentId       String
+  agent         User     @relation("AgentProperties", fields: [agentId], references: [id])
+  
+  ownerId       String?
+  owner         CustomerLedger? @relation("PropertyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  
+  title         String
+  propertyType  String   // "아파트", "상가", "오피스텔", "토지", "기타"
+  address       String
+  price         Int      // 단위: 만원
+  
+  status        String   @default("AVAILABLE") // "AVAILABLE", "RESERVED", "SOLD"
+  notes         String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([status])
+  @@index([ownerId])
+}

@@ -25,6 +25,7 @@ export default function PropertyAutoFillMockup() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans p-8">
+      <div className="bg-amber-100 border border-amber-300 text-amber-800 text-sm font-bold px-4 py-2 rounded-lg mb-6 text-center">[목업 — 실제화 대기] 이 화면은 목업이며 실데이터와 연결되어 있지 않습니다.</div>
       <div className="max-w-5xl mx-auto">
         <div className="mb-8 flex justify-between items-end">
           <div>

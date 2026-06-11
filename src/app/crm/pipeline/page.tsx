@@ -1,141 +1,318 @@
 /*---
-id: page.tsx
-milestone: M0
-why: 페이지 UI 진입점 (page.tsx)
-backlinks: [[[Pages]]]
+id: crm/pipeline/page.tsx
+milestone: M10
+why: 계약 파이프라인 칸반 — 서명 대기 → 지급 대기 → 지급 완료(+미지급 보류) 단계 처리 (실데이터)
+backlinks: [[[Pages]], [[api/contracts/route.ts]], [[crm/page.tsx]]]
 ---*/
 
+/**
+ * @file src/app/crm/pipeline/page.tsx
+ * @description 계약 파이프라인 칸반 — 월 선택 + 상단 합계(건수·총 보수액),
+ *              4컬럼: 서명 대기(PENDING/PENDING) → 지급 대기(SIGNED/PENDING) → 지급 완료(SIGNED/PAID) → 미지급 보류(NON_PAID).
+ *              카드 버튼으로 다음 단계 처리(사유 prompt → PATCH /api/contracts/[id])
+ * @dependencies /api/contracts (GET ?month=&withDocs=1, PATCH [id])
+ */
+
 'use client';
+
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 
-export default function PipelineMockup() {
+type ContractRow = {
+  id: string;
+  agentId: string;
+  propertyAddress: string | null;
+  clientName: string | null;
+  contractType: string | null;
+  grossCommission: number;
+  contractDate: string;
+  signatureStatus: 'PENDING' | 'SIGNED';
+  paymentStatus: 'PENDING' | 'PAID' | 'NON_PAID';
+  agent: { name: string; role: string; employeeId: string } | null;
+};
+
+/** 원 단위 금액 → "12억 3,000만" 한국어 축약 표기 */
+function formatKoreanPrice(won: number): string {
+  if (won === 0) return '0원';
+  if (won < 10000) return `${won.toLocaleString('ko-KR')}원`;
+  const eok = Math.floor(won / 100_000_000);
+  const man = Math.floor((won % 100_000_000) / 10_000);
+  const parts: string[] = [];
+  if (eok > 0) parts.push(`${eok.toLocaleString('ko-KR')}억`);
+  if (man > 0) parts.push(`${man.toLocaleString('ko-KR')}만`);
+  return parts.join(' ');
+}
+
+const dateLabel = (iso: string) =>
+  new Date(iso).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+
+const currentYearMonth = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/** YYYY-MM 문자열에 delta(개월)를 더한다 */
+function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+type ColumnKey = 'SIGN_WAIT' | 'PAY_WAIT' | 'PAID' | 'NON_PAID';
+
+const COLUMNS: {
+  key: ColumnKey;
+  title: string;
+  accent: string; // 헤더 텍스트 색
+  badge: string; // 건수 뱃지 색
+}[] = [
+  { key: 'SIGN_WAIT', title: '서명 대기', accent: 'text-amber-400', badge: 'bg-amber-500/10 text-amber-400' },
+  { key: 'PAY_WAIT', title: '서명 완료 · 지급 대기', accent: 'text-amber-400', badge: 'bg-amber-500/10 text-amber-400' },
+  { key: 'PAID', title: '지급 완료', accent: 'text-emerald-400', badge: 'bg-emerald-500/10 text-emerald-400' },
+  { key: 'NON_PAID', title: '미지급 보류', accent: 'text-rose-400', badge: 'bg-rose-500/10 text-rose-400' },
+];
+
+function columnOf(c: ContractRow): ColumnKey {
+  if (c.paymentStatus === 'NON_PAID') return 'NON_PAID';
+  if (c.paymentStatus === 'PAID') return 'PAID';
+  if (c.signatureStatus === 'SIGNED') return 'PAY_WAIT';
+  return 'SIGN_WAIT';
+}
+
+export default function ContractPipelinePage() {
+  const [month, setMonth] = useState(currentYearMonth());
+  const [contracts, setContracts] = useState<ContractRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [patchingId, setPatchingId] = useState<string | null>(null);
+
+  const fetchContracts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/contracts?month=${month}&withDocs=1&limit=200`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || '계약 목록을 불러오지 못했습니다.');
+      }
+      const data = await res.json();
+      setContracts(data.contracts || []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '계약 목록을 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }, [month]);
+
+  useEffect(() => {
+    fetchContracts();
+  }, [fetchContracts]);
+
+  /** 상태 변경: 사유 prompt → PATCH → 재조회 */
+  const patchStatus = async (
+    id: string,
+    patch: { signatureStatus?: 'SIGNED'; paymentStatus?: 'PAID' | 'NON_PAID' },
+    promptLabel: string
+  ) => {
+    const reason = window.prompt(`${promptLabel} — 변경 사유를 입력하세요.`);
+    if (!reason || !reason.trim()) return;
+    setPatchingId(id);
+    try {
+      const res = await fetch(`/api/contracts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...patch, reason: reason.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || '상태 변경에 실패했습니다.');
+      }
+      await fetchContracts();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '상태 변경에 실패했습니다.');
+    } finally {
+      setPatchingId(null);
+    }
+  };
+
+  const grouped: Record<ColumnKey, ContractRow[]> = {
+    SIGN_WAIT: [],
+    PAY_WAIT: [],
+    PAID: [],
+    NON_PAID: [],
+  };
+  contracts.forEach((c) => grouped[columnOf(c)].push(c));
+
+  const totalCommission = contracts.reduce((sum, c) => sum + (c.grossCommission || 0), 0);
+  const paidCommission = grouped.PAID.reduce((sum, c) => sum + (c.grossCommission || 0), 0);
+  const [y, m] = month.split('-');
+
+  const actionBtn =
+    'w-full mt-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50';
+
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8 flex justify-between items-end">
+    <div className="min-h-screen bg-[#0a0c10] text-[#cdd2da] p-8 [word-break:keep-all]">
+      <div className="max-w-[1500px] mx-auto space-y-6">
+        {/* 헤더 + 월 선택 */}
+        <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
-            <Link href="/crm" className="text-blue-600 font-bold mb-4 inline-block hover:underline">← CRM 홈으로</Link>
-            <h1 className="text-3xl font-extrabold text-slate-900 mb-2">포스트 브로커리지 (Post-Brokerage) 밸류체인</h1>
-            <p className="text-slate-500">계약이 끝난 고객을 버리지 않습니다. 인테리어, 가구 렌탈, 임대 관리(PM)로 이어지는 추가 수익 파이프라인입니다.</p>
+            <Link href="/crm" className="text-xs text-indigo-400 hover:text-indigo-300">
+              ← CRM 홈
+            </Link>
+            <h1 className="text-2xl font-bold text-white tracking-tight mt-1">계약 파이프라인</h1>
+            <p className="text-sm text-zinc-500 mt-1">
+              {y}년 {Number(m)}월 — 서명 → 지급까지 단계별 처리
+            </p>
           </div>
-          <button className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl shadow-lg hover:bg-slate-800 transition-all">
-            + 신규 파이프라인 보드 추가
-          </button>
-        </div>
-
-        <div className="flex gap-6 overflow-x-auto pb-8 snap-x">
-          
-          {/* Column 1: Contract Closed */}
-          <div className="bg-slate-100 rounded-2xl w-96 flex-shrink-0 flex flex-col snap-start shadow-inner border border-slate-200">
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-200/50 rounded-t-2xl">
-              <h2 className="font-bold text-slate-700">1. 매매/임대 계약 완료</h2>
-              <span className="bg-slate-300 text-slate-600 text-xs font-bold px-2 py-1 rounded-full">3건</span>
-            </div>
-            <div className="p-4 flex-1 space-y-4">
-              
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-grab hover:ring-2 hover:ring-blue-400 transition-all">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">오피스 임대</span>
-                  <span className="text-slate-400 text-xs">2일 전</span>
-                </div>
-                <h3 className="font-bold text-slate-900">스타트업 'A'팀 강남 이전</h3>
-                <p className="text-sm text-slate-500 mb-3">전용 80평 / 월 1,200만</p>
-                <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-                  <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">JD</div>
-                  <button className="text-xs font-bold text-slate-500 hover:text-slate-800">→ 인테리어 제안하기</button>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-grab hover:ring-2 hover:ring-blue-400 transition-all">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded">빌딩 매입</span>
-                  <span className="text-slate-400 text-xs">5일 전</span>
-                </div>
-                <h3 className="font-bold text-slate-900">서초동 꼬마빌딩 (이현우 님)</h3>
-                <p className="text-sm text-slate-500 mb-3">매매가 85억</p>
-                <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-                  <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">HL</div>
-                  <button className="text-xs font-bold text-slate-500 hover:text-slate-800">→ 임대 관리(PM) 제안</button>
-                </div>
-              </div>
-
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMonth((prev) => shiftMonth(prev, -1))}
+              className="px-3 py-2 rounded-lg text-sm bg-[#11141a] border border-[#1f2430] text-zinc-400 hover:text-white transition-colors"
+              aria-label="이전 달"
+            >
+              ←
+            </button>
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => e.target.value && setMonth(e.target.value)}
+              className="bg-[#11141a] border border-[#1f2430] rounded-lg px-3 py-2 text-sm text-[#cdd2da] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            <button
+              onClick={() => setMonth((prev) => shiftMonth(prev, 1))}
+              className="px-3 py-2 rounded-lg text-sm bg-[#11141a] border border-[#1f2430] text-zinc-400 hover:text-white transition-colors"
+              aria-label="다음 달"
+            >
+              →
+            </button>
           </div>
+        </header>
 
-          {/* Column 2: Interior Bidding */}
-          <div className="bg-blue-50 rounded-2xl w-96 flex-shrink-0 flex flex-col snap-start shadow-inner border border-blue-100">
-            <div className="p-4 border-b border-blue-200 flex justify-between items-center bg-blue-100/50 rounded-t-2xl">
-              <h2 className="font-bold text-blue-900">2. 인테리어/시공 컨설팅 중</h2>
-              <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-1 rounded-full">1건</span>
-            </div>
-            <div className="p-4 flex-1 space-y-4">
-              
-              <div className="bg-white p-4 rounded-xl shadow-[0_4px_15px_rgba(59,130,246,0.1)] border border-blue-200 cursor-grab transition-all">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded">사옥 리모델링</span>
-                  <span className="text-slate-400 text-xs">진행 중</span>
-                </div>
-                <h3 className="font-bold text-slate-900">역삼동 노후건물 밸류업</h3>
-                <p className="text-sm text-slate-500 mb-3">예상 공사비: 약 12억 원</p>
-                <div className="w-full bg-slate-100 rounded-full h-1.5 mb-3">
-                  <div className="bg-blue-500 h-1.5 rounded-full w-[60%]"></div>
-                </div>
-                <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-                  <div className="text-xs font-bold text-slate-600">제휴업체 3곳 견적 비교 중</div>
-                  <div className="flex -space-x-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-200 border-2 border-white"></div>
-                    <div className="w-6 h-6 rounded-full bg-emerald-200 border-2 border-white"></div>
+        {/* 답 먼저: 상단 합계 */}
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl">
+          <div className="bg-[#11141a] border border-[#1f2430] rounded-xl p-5">
+            <p className="text-xs text-zinc-500 mb-2">이번 달 계약</p>
+            <p className="text-3xl font-bold text-white tabular-nums">
+              {loading ? '—' : contracts.length}
+              <span className="text-base font-medium text-zinc-500 ml-1">건</span>
+            </p>
+          </div>
+          <div className="bg-[#11141a] border border-[#1f2430] rounded-xl p-5">
+            <p className="text-xs text-zinc-500 mb-2">총 중개보수</p>
+            <p className="text-3xl font-bold text-white tabular-nums">
+              {loading ? '—' : formatKoreanPrice(totalCommission)}
+            </p>
+          </div>
+          <div className="bg-[#11141a] border border-[#1f2430] rounded-xl p-5">
+            <p className="text-xs text-zinc-500 mb-2">지급 완료액</p>
+            <p className="text-3xl font-bold text-emerald-400 tabular-nums">
+              {loading ? '—' : formatKoreanPrice(paidCommission)}
+            </p>
+          </div>
+        </section>
+
+        {/* 칸반 보드 */}
+        {loading ? (
+          <div className="bg-[#11141a] border border-[#1f2430] rounded-xl p-16 text-center text-zinc-500 text-sm">
+            계약 파이프라인을 불러오는 중...
+          </div>
+        ) : error ? (
+          <div className="bg-[#11141a] border border-[#1f2430] rounded-xl p-16 text-center">
+            <p className="text-rose-400 text-sm mb-3">{error}</p>
+            <button onClick={fetchContracts} className="text-sm text-indigo-400 hover:text-indigo-300 underline">
+              다시 시도
+            </button>
+          </div>
+        ) : contracts.length === 0 ? (
+          <div className="bg-[#11141a] border border-[#1f2430] rounded-xl p-16 text-center text-zinc-500 text-sm">
+            {y}년 {Number(m)}월에 등록된 계약이 없습니다. 다른 달을 선택해 보세요.
+          </div>
+        ) : (
+          <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+            {COLUMNS.map((col) => {
+              const items = grouped[col.key];
+              const colSum = items.reduce((sum, c) => sum + (c.grossCommission || 0), 0);
+              return (
+                <div key={col.key} className="bg-[#11141a] border border-[#1f2430] rounded-xl flex flex-col">
+                  <div className="px-4 py-3 border-b border-[#1f2430] flex items-center justify-between">
+                    <h2 className={`text-sm font-semibold ${col.accent}`}>{col.title}</h2>
+                    <span className={`px-2 py-0.5 rounded text-xs font-bold tabular-nums ${col.badge}`}>
+                      {items.length}건
+                    </span>
+                  </div>
+                  <div className="px-4 py-2 border-b border-[#1f2430] text-right text-xs text-zinc-500 tabular-nums">
+                    소계 {formatKoreanPrice(colSum)}
+                  </div>
+                  <div className="p-3 space-y-3 min-h-[80px]">
+                    {items.length === 0 && (
+                      <p className="text-center text-xs text-zinc-600 py-6">해당 단계 계약 없음</p>
+                    )}
+                    {items.map((c) => (
+                      <div key={c.id} className="bg-[#0a0c10] border border-[#1f2430] rounded-lg p-3">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="font-semibold text-white text-sm">{c.clientName || '고객 미지정'}</p>
+                          <span className="text-xs text-zinc-500 tabular-nums shrink-0">
+                            {dateLabel(c.contractDate)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-400 mb-2">{c.propertyAddress || '주소 미입력'}</p>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-zinc-500">
+                            {c.agent?.name ?? '담당 미지정'}
+                            {c.contractType && <span className="ml-1 text-zinc-600">· {c.contractType}</span>}
+                          </span>
+                          <span className="text-white font-semibold tabular-nums text-right">
+                            {formatKoreanPrice(c.grossCommission)}
+                          </span>
+                        </div>
+
+                        {col.key === 'SIGN_WAIT' && (
+                          <button
+                            disabled={patchingId === c.id}
+                            onClick={() => patchStatus(c.id, { signatureStatus: 'SIGNED' }, '서명 완료 처리')}
+                            className={`${actionBtn} bg-indigo-600 hover:bg-indigo-500 text-white`}
+                          >
+                            {patchingId === c.id ? '처리 중...' : '서명 완료 처리 →'}
+                          </button>
+                        )}
+                        {col.key === 'PAY_WAIT' && (
+                          <div className="flex gap-2">
+                            <button
+                              disabled={patchingId === c.id}
+                              onClick={() => patchStatus(c.id, { paymentStatus: 'PAID' }, '지급 완료 처리')}
+                              className={`${actionBtn} bg-indigo-600 hover:bg-indigo-500 text-white`}
+                            >
+                              {patchingId === c.id ? '처리 중...' : '지급 완료 →'}
+                            </button>
+                            <button
+                              disabled={patchingId === c.id}
+                              onClick={() => patchStatus(c.id, { paymentStatus: 'NON_PAID' }, '미지급 보류 처리')}
+                              className={`${actionBtn} bg-[#11141a] border border-rose-500/40 text-rose-400 hover:bg-rose-500/10`}
+                            >
+                              미지급 보류
+                            </button>
+                          </div>
+                        )}
+                        {col.key === 'NON_PAID' && (
+                          <button
+                            disabled={patchingId === c.id}
+                            onClick={() => patchStatus(c.id, { paymentStatus: 'PAID' }, '미지급 해소 — 지급 완료 처리')}
+                            className={`${actionBtn} bg-indigo-600 hover:bg-indigo-500 text-white`}
+                          >
+                            {patchingId === c.id ? '처리 중...' : '지급 완료 처리 →'}
+                          </button>
+                        )}
+                        {col.key === 'PAID' && (
+                          <p className="mt-2 text-center text-xs text-emerald-400 font-semibold">완료</p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Column 3: Property Management */}
-          <div className="bg-emerald-50 rounded-2xl w-96 flex-shrink-0 flex flex-col snap-start shadow-inner border border-emerald-100">
-            <div className="p-4 border-b border-emerald-200 flex justify-between items-center bg-emerald-100/50 rounded-t-2xl">
-              <h2 className="font-bold text-emerald-900">3. 임대/자산 관리 (PM) 운영 중</h2>
-              <span className="bg-emerald-200 text-emerald-800 text-xs font-bold px-2 py-1 rounded-full">2건 (월 고정수익)</span>
-            </div>
-            <div className="p-4 flex-1 space-y-4">
-              
-              <div className="bg-white p-4 rounded-xl shadow-[0_4px_15px_rgba(16,185,129,0.1)] border border-emerald-200 cursor-grab transition-all">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded">PM 계약 유지</span>
-                  <span className="text-emerald-600 font-bold text-xs">월 수익 150만</span>
-                </div>
-                <h3 className="font-bold text-slate-900">청담동 메디컬 빌딩</h3>
-                <p className="text-sm text-slate-500 mb-3">총 7개층 / 공실 0</p>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span className="text-xs text-slate-600">이번 달 임대료 수납률 100%</span>
-                </div>
-                <button className="w-full py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-xs rounded-lg transition-colors border border-emerald-200">
-                  자산 운용 보고서 발행
-                </button>
-              </div>
-
-              <div className="bg-white p-4 rounded-xl shadow-[0_4px_15px_rgba(16,185,129,0.1)] border border-emerald-200 cursor-grab transition-all opacity-80">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded">PM 계약 유지</span>
-                  <span className="text-emerald-600 font-bold text-xs">월 수익 80만</span>
-                </div>
-                <h3 className="font-bold text-slate-900">신사동 근생 건물</h3>
-                <p className="text-sm text-slate-500 mb-3">총 4개층 / 공실 1</p>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-                  <span className="text-xs text-rose-600 font-bold">2층 임차인 연체 1개월</span>
-                </div>
-                <button className="w-full py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 font-bold text-xs rounded-lg transition-colors border border-slate-200">
-                  명도 소송/내용증명 관리
-                </button>
-              </div>
-
-            </div>
-          </div>
-
-        </div>
+              );
+            })}
+          </section>
+        )}
       </div>
     </div>
   );

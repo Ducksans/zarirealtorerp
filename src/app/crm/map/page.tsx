@@ -11,6 +11,7 @@ import Link from 'next/link';
 export default function PolygonMapMockup() {
   return (
     <div className="h-screen bg-slate-50 flex flex-col font-sans">
+      <div className="bg-amber-100 border-b border-amber-300 text-amber-800 text-sm font-bold px-4 py-2 text-center">[목업 — 실제화 대기] 이 화면은 목업이며 실데이터와 연결되어 있지 않습니다.</div>
       <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm z-10 relative">
         <div className="flex items-center gap-4">
           <Link href="/crm" className="text-blue-600 font-bold hover:underline">← CRM 홈</Link>
